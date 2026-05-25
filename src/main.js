@@ -13,7 +13,7 @@ import { renderSession, startSession, endSession, toggleTimer, logSet, selEx, st
 import { renderStats } from './screens/Stats.js';
 import { renderHistory, clearHistory } from './screens/History.js';
 import { renderProgress } from './screens/Progress.js';
-import { renderProfile, saveProfileField, selectPlan, saveCurrentWeight } from './screens/Profile.js';
+import { renderProfile, saveProfileField, selectPlan, saveCurrentWeight, toggleFilterLevel, toggleFilterGoal, clearFilters } from './screens/Profile.js';
 import { renderInstall } from './screens/Install.js';
 import { renderPlanCreator, startPlanCreator } from './screens/PlanCreator.js';
 import { renderExerciseDetail } from './screens/ExerciseDetail.js';
@@ -91,6 +91,9 @@ window.restSkip = restSkip;
 window.saveProfileField = saveProfileField;
 window.selectPlan = selectPlan;
 window.saveCurrentWeight = saveCurrentWeight;
+window.toggleFilterLevel = toggleFilterLevel;
+window.toggleFilterGoal = toggleFilterGoal;
+window.clearFilters = clearFilters;
 window.clearHistory = clearHistory;
 window.advanceWeek = advanceWeek;
 window.exportData = async () => {
@@ -215,10 +218,21 @@ async function showOnboarding() {
     <div class="card onboarding-card">
       <div style="font-size:48px;margin-bottom:12px">🏀</div>
       <h2>Bienvenido a BasketTracker</h2>
-      <p>Tu entrenador personal de gimnasio. Sigue rutinas estructuradas, registra tus progresos y alcanza tus metas.</p>
+      <p>Tu entrenador personal de gimnasio con inteligencia artificial. Sigue rutinas estructuradas, registra tus progresos y transfiere tu fuerza al deporte que elijas.</p>
       <div class="profile-field">
         <label>Tu nombre</label>
         <input type="text" id="onboardName" placeholder="Ej: Roberto" style="width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--br);background:var(--sf);color:var(--tx);font-size:16px;text-align:center">
+      </div>
+      <div class="profile-field">
+        <label>Tu deporte</label>
+        <select id="onboardSport" style="width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--br);background:var(--sf);color:var(--tx);font-size:16px">
+          <option value="basketball" selected>🏀 Básquetbol</option>
+          <option value="football">⚽ Fútbol</option>
+          <option value="running">🏃 Running</option>
+          <option value="tennis">🎾 Tenis</option>
+          <option value="crossfit">💥 CrossFit</option>
+          <option value="general">🏋️ General</option>
+        </select>
       </div>
       <div class="profile-field">
         <label>Tu plan de entrenamiento</label>
@@ -234,7 +248,8 @@ async function showOnboarding() {
     const name = $('onboardName')?.value.trim();
     if (!name) { $('onboardName')?.focus(); return }
     const planIdx = parseInt($('onboardPlan')?.value || '0');
-    await dbSet('profile', { name, gender: 'male', dob: '', height: 175 });
+    const sport = $('onboardSport')?.value || 'basketball';
+    await dbSet('profile', { name, gender: 'male', dob: '', height: 175, sport });
     await dbSet('planIdx', planIdx);
     $('onboardingOverlay')?.remove();
     $('home')?.classList.add('active');

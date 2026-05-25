@@ -1,6 +1,7 @@
 import { dbGet } from './storage.js'
 import { getCurrentWeek } from './planUtils.js'
 import { findExerciseByName as findEx, getVariants as getExVariants } from '../data/exercises/index.js'
+import { getSport, getExerciseSportBenefit } from '../data/sports.js'
 
 const STALL_THRESHOLD = 3
 const MIN_PROGRESS_PCT = 2.5
@@ -107,9 +108,11 @@ export function suggestVariant(exName) {
   }
 }
 
-export async function getSessionAdvice(log, planIdx) {
+export async function getSessionAdvice(log, planIdx, sportId) {
   if (!log || !log.ex || log.ex.length === 0) return []
 
+  const sport = sportId ? getSport(sportId) : null
+  const sportName = sport ? sport.name : null
   const adviceList = []
 
   for (const exLog of log.ex) {
@@ -117,7 +120,21 @@ export async function getSessionAdvice(log, planIdx) {
 
     const planExercise = await findPlanExercise(exLog.n, planIdx)
     const exAdvice = analyzeExercise(exLog, planExercise)
-    if (exAdvice) adviceList.push({ exercise: exLog.n, ...exAdvice })
+    if (exAdvice) {
+      const item = { exercise: exLog.n, ...exAdvice }
+      // Add sport-specific transfer benefit
+      if (sportId && sportId !== 'general') {
+        const ex = findEx(exLog.n)
+        if (ex) {
+          const benefit = getExerciseSportBenefit(ex.id, sportId)
+          if (benefit) {
+            item.sportBenefit = benefit
+            item.sportName = sportName
+          }
+        }
+      }
+      adviceList.push(item)
+    }
 
     if (exAdvice && exAdvice.type === 'stall') {
       const variant = suggestVariant(exLog.n)
@@ -162,5 +179,3 @@ async function findPlanExercise(name, planIdx) {
   }
   return null
 }
-
-

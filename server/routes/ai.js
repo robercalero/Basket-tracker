@@ -6,11 +6,49 @@ const LLM_API_KEY = process.env.LLM_API_KEY || '';
 const LLM_ENDPOINT = process.env.LLM_ENDPOINT || 'https://api.openai.com/v1/chat/completions';
 const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
 
-// Rule-based fallback advice engine (offline)
-function localAdvice(exerciseLog, query) {
+const SPORTS = {
+  basketball: {
+    name: 'Básquetbol',
+    attributes: 'salto vertical, potencia explosiva, agilidad lateral, velocidad, core estable, resistencia y fuerza funcional',
+    context: 'El usuario entrena en el gimnasio para rendir mejor en la cancha de básquetbol. Conecta cada ejercicio con su transferencia al juego real: saltos, rebotes, defensa, cambios de dirección, protección del balón y tiro.',
+  },
+  football: {
+    name: 'Fútbol',
+    attributes: 'velocidad, potencia explosiva, agilidad, resistencia, core estable y fuerza funcional',
+    context: 'El usuario entrena en el gimnasio para rendir mejor en el campo de fútbol. Conecta cada ejercicio con su transferencia al juego real: sprints, golpeo, duelos, cambios de dirección y protección del balón.',
+  },
+  running: {
+    name: 'Running',
+    attributes: 'resistencia, velocidad, core estable y fuerza resistencia',
+    context: 'El usuario entrena en el gimnasio para mejorar su rendimiento corriendo. Conecta cada ejercicio con su transferencia a la carrera: economía de zancada, prevención de lesiones y fuerza en cuestas.',
+  },
+  tennis: {
+    name: 'Tenis',
+    attributes: 'potencia explosiva, desplazamiento lateral, rotación de core y resistencia',
+    context: 'El usuario entrena en el gimnasio para rendir mejor en la pista de tenis. Conecta cada ejercicio con su transferencia al juego real: saque, golpes de fondo, desplazamientos laterales y prevención de lesiones.',
+  },
+  crossfit: {
+    name: 'CrossFit',
+    attributes: 'fuerza general, resistencia metabólica, potencia y core',
+    context: 'El usuario entrena para rendir en CrossFit. Conecta cada ejercicio con su aplicación en WODs: levantamientos olímpicos, gimnásticos y trabajo metabólico.',
+  },
+  general: {
+    name: 'General',
+    attributes: 'fuerza, hipertrofia y resistencia',
+    context: 'El usuario entrena con objetivos generales de fitness. Proporciona recomendaciones estándar de fuerza, hipertrofia y acondicionamiento.',
+  },
+};
+
+function getSportInfo(sportId) {
+  return SPORTS[sportId] || SPORTS.basketball;
+}
+
+function localAdvice(exerciseLog, query, sportId) {
   const lines = [];
+  const sport = getSportInfo(sportId);
+
   if (!exerciseLog || exerciseLog.length === 0) {
-    return 'Aún no tienes datos registrados. Completa algunos entrenamientos para recibir recomendaciones personalizadas.';
+    return `Aún no tienes datos registrados. Completa algunos entrenamientos para recibir recomendaciones personalizadas para ${sport.name}.`;
   }
 
   for (const ex of exerciseLog) {
@@ -40,15 +78,16 @@ function localAdvice(exerciseLog, query) {
   }
 
   if (lines.length === 0) {
-    return 'Sigue entrenando consistentemente. En unas semanas tendré datos suficientes para darte recomendaciones más precisas.';
+    return `Sigue entrenando consistentemente para ${sport.name}. En unas semanas tendré datos suficientes para darte recomendaciones más precisas y específicas para tu deporte.`;
   }
 
   return lines.join('\n');
 }
 
-// LLM-powered advice (online)
-async function llmAdvice(exerciseLog, query) {
+async function llmAdvice(exerciseLog, query, sportId) {
   if (!LLM_API_KEY) return null;
+
+  const sport = getSportInfo(sportId);
 
   const context = exerciseLog.slice(-5).map(ex => {
     const sets = (ex.sets || []).slice(-3).map(s => `${s.w}kg x ${s.r || '?'} reps${s.wu ? ' (calentamiento)' : ''}`).join(', ');
@@ -58,18 +97,23 @@ async function llmAdvice(exerciseLog, query) {
   const messages = [
     {
       role: 'system',
-      content: `Eres un entrenador personal experto en fitness con enfoque en fuerza, hipertrofia y resistencia.
+      content: `Eres un entrenador personal experto en rendimiento deportivo con especialización en transferencia del entrenamiento de gimnasio al deporte específico.
 
-Analiza los datos de entrenamiento del usuario y proporciona:
-1. Retroalimentación sobre su progreso (qué ejercicios mejoran, cuáles se estancan)
-2. Recomendaciones específicas de peso, repeticiones o variantes de ejercicio
-3. Consejos sobre volumen, frecuencia o intensidad
+Deporte del usuario: **${sport.name}**
+Atributos clave: ${sport.attributes}
 
-Sé conciso, práctico y motivador. Responde en español. Máximo 3 párrafos.`,
+${sport.context}
+
+Formato de respuesta:
+1. Análisis del progreso actual en el gimnasio
+2. Transferencia específica al ${sport.name}: cómo cada mejora en el gym impacta en el rendimiento deportivo
+3. Recomendaciones prácticas para la próxima sesión
+
+Responde en español. Máximo 3 párrafos. Sé conciso, específico y motivador.`,
     },
     {
       role: 'user',
-      content: `Datos de mis últimos entrenamientos:\n${context || '(sin datos)'}\n\nMi consulta: ${query || '¿Qué opinas de mi progreso y qué debería mejorar?'}`,
+      content: `Datos de mis últimos entrenamientos para ${sport.name}:\n${context || '(sin datos)'}\n\nMi consulta: ${query || '¿Cómo puedo transferir mi progreso del gym a mi rendimiento en ${sport.name}?'}`,
     },
   ];
 
@@ -104,19 +148,19 @@ Sé conciso, práctico y motivador. Responde en español. Máximo 3 párrafos.`,
 router.post('/ai/coach', async (req, res) => {
   if (!requireDB(req, res)) return;
 
-  const { exerciseLog, query } = req.body;
+  const { exerciseLog, query, sport } = req.body;
+  const sportId = sport || 'basketball';
 
   try {
-    // Try LLM first, fallback to local
-    let advice = await llmAdvice(exerciseLog || [], query || '');
+    let advice = await llmAdvice(exerciseLog || [], query || '', sportId);
     let source = 'llm';
 
     if (!advice) {
-      advice = localAdvice(exerciseLog || [], query || '');
+      advice = localAdvice(exerciseLog || [], query || '', sportId);
       source = 'local';
     }
 
-    res.json({ advice, source });
+    res.json({ advice, source, sport: sportId });
   } catch (err) {
     res.status(500).json({
       advice: 'Error al generar recomendaciones. Intenta de nuevo más tarde.',

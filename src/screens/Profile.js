@@ -4,18 +4,34 @@ import { PLANS } from '../data/plans/index.js';
 import { renderHome } from './Home.js';
 import { getCurrentWeek, advanceWeek } from '../services/planUtils.js';
 import { deleteCustomPlan } from '../services/customPlans.js';
+import { SPORTS } from '../data/sports.js';
+
+const LEVELS = ['beginner', 'intermediate', 'advanced'];
+const LEVEL_NAMES = { beginner: 'Principiante', intermediate: 'Intermedio', advanced: 'Avanzado' };
+const GOALS = ['hypertrophy', 'strength', 'endurance'];
+const GOAL_NAMES = { hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 'Resistencia' };
+
+let filterLevel = null;
+let filterGoal = null;
 
 export async function renderProfile() {
   const scr = $('profile');
   if (!scr) return;
   scr.innerHTML = '';
 
-  const profile = await dbGet('profile', { name: '', gender: 'male', dob: '', height: 175 });
+  const profile = await dbGet('profile', { name: '', gender: 'male', dob: '', height: 175, sport: 'basketball' });
   const planIdx = await findActivePlanIdx();
   const weightLog = await dbGet('weightLog', []);
   const customPlans = await (await import('../services/customPlans.js')).getCustomPlans();
   const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
   const plan = allPlans[planIdx] || PLANS[0];
+  const sport = SPORTS.find(s => s.id === profile.sport) || SPORTS[0];
+
+  const filteredPlans = allPlans.filter(p => {
+    if (filterLevel && p.level !== filterLevel) return false;
+    if (filterGoal && p.goal !== filterGoal) return false;
+    return true;
+  });
 
   scr.innerHTML = `
     <div class="card text-center">
@@ -41,6 +57,17 @@ export async function renderProfile() {
         <label>Altura (cm)</label>
         <input type="number" id="profHeight" value="${profile.height || 175}" placeholder="175" onchange="saveProfileField('height',this.value)">
       </div>
+      <div class="profile-field">
+        <label>Deporte</label>
+        <select id="profSport" onchange="saveProfileField('sport',this.value)">
+          ${SPORTS.map(s => `<option value="${s.id}" ${profile.sport === s.id ? 'selected' : ''}>${s.emoji} ${s.name}</option>`).join('')}
+        </select>
+      </div>
+      <div style="margin-top:8px;padding:8px 12px;background:var(--sf);border-radius:8px;font-size:12px;color:var(--tx2)">
+        ${sport.emoji} <strong>${sport.name}</strong>
+        <span style="margin-left:6px">${sport.attributes.map(a => a.emoji).join(' ')}</span>
+        <div style="margin-top:4px;font-size:11px;opacity:0.7">El Coach AI adaptará sus recomendaciones a tu deporte</div>
+      </div>
     </div>
 
     <div class="card">
@@ -62,30 +89,44 @@ export async function renderProfile() {
 
     <div class="card">
       <div style="font-size:12px;color:var(--tx2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Plan de entrenamiento</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--tx3);padding:4px 0;width:100%">Filtrar por nivel:</span>
+        ${LEVELS.map(l => `
+          <span class="filter-chip" style="padding:4px 12px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:12px;cursor:pointer${filterLevel === l ? ' active' : ''}" onclick="window.toggleFilterLevel('${l}')">${LEVEL_NAMES[l]}</span>
+        `).join('')}
+        <span style="font-size:11px;color:var(--tx3);padding:4px 0;width:100%;margin-top:4px">Filtrar por objetivo:</span>
+        ${GOALS.map(g => `
+          <span class="filter-chip" style="padding:4px 12px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:12px;cursor:pointer${filterGoal === g ? ' active' : ''}" onclick="window.toggleFilterGoal('${g}')">${GOAL_NAMES[g]}</span>
+        `).join('')}
+        ${(filterLevel || filterGoal) ? '<span style="padding:4px 12px;border-radius:6px;background:transparent;border:1px solid var(--re);font-size:11px;cursor:pointer;color:var(--re)" onclick="window.clearFilters()">✕ Limpiar filtros</span>' : ''}
+      </div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        ${allPlans.map((p, i) => `
-          <div class="plan-card ${i === planIdx ? 'active' : ''}" onclick="selectPlan(${i})" style="${i === planIdx ? 'border-color:var(--ac)' : ''}">
+        ${filteredPlans.map((p, i) => {
+          const realIdx = allPlans.indexOf(p);
+          return `
+          <div class="plan-card ${realIdx === planIdx ? 'active' : ''}" onclick="selectPlan(${realIdx})" style="${realIdx === planIdx ? 'border-color:var(--ac)' : ''}">
             <span class="plan-emoji">${p.emoji || '📋'}</span>
             <div class="plan-info">
               <div class="plan-name">${p.name}${p.custom ? ' <span style="font-size:10px;background:var(--ac);padding:1px 5px;border-radius:4px;color:#fff">custom</span>' : ''}</div>
               <div class="plan-desc">${p.desc || ''}</div>
               <div style="display:flex;gap:6px;margin-top:4px">
-                <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${p.level || 'intermediate'}</span>
-                <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${p.goal || 'hypertrophy'}</span>
+                <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${LEVEL_NAMES[p.level] || p.level || 'intermediate'}</span>
+                <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${GOAL_NAMES[p.goal] || p.goal || 'hypertrophy'}</span>
                 <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${p.daysPerWeek || '?'}d/sem</span>
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
-              ${i === planIdx ? '<span style="color:var(--ac);font-size:12px;font-weight:600">ACTIVO</span>' : ''}
+              ${realIdx === planIdx ? '<span style="color:var(--ac);font-size:12px;font-weight:600">ACTIVO</span>' : ''}
               ${p.custom ? `<span style="cursor:pointer;color:var(--re);font-size:16px;opacity:0.6" onclick="event.stopPropagation();window.delCustPlan('${p.id}')">✕</span>` : ''}
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
+        ${filteredPlans.length === 0 ? '<div style="color:var(--tx3);font-size:13px;text-align:center;padding:12px">Ningún plan coincide con los filtros</div>' : ''}
       </div>
       <button class="btn btn-sm btn-ghost btn-block" onclick="window.startPlanCreator()" style="margin-top:8px;font-size:12px">+ Crear plan personalizado</button>
       </div>
     </div>`;
 
-  // Week progression for multi-week plans
   if (plan && plan.weeks && plan.weeks.length > 1) {
     const weekCard = document.createElement('div');
     weekCard.className = 'card';
@@ -126,7 +167,6 @@ export async function renderProfile() {
   scr.appendChild(installCard);
 
   scr.classList.add('active');
-  // Show install button if prompt is available
   const installBtn = document.getElementById('installBtn');
   if (installBtn && window.__deferredPrompt) installBtn.style.display = 'inline-flex';
 
@@ -136,10 +176,11 @@ export async function renderProfile() {
 }
 
 export async function saveProfileField(field, value) {
-  const profile = await dbGet('profile', { name: '', gender: 'male', dob: '', height: 175 });
+  const profile = await dbGet('profile', { name: '', gender: 'male', dob: '', height: 175, sport: 'basketball' });
   profile[field] = value;
   if (field === 'height') profile[field] = parseFloat(value) || 175;
   await dbSet('profile', profile);
+  renderProfile();
 }
 
 export async function selectPlan(idx) {
@@ -148,14 +189,12 @@ export async function selectPlan(idx) {
   const plan = allPlans[idx];
   if (!plan) return;
   await dbSet('planIdx', idx);
-  // If it's a custom plan, also store its ID for stable referencing
   if (plan.custom) {
     await dbSet('customPlanId', plan.id);
   } else {
     await dbDel('customPlanId');
   }
   await renderProfile();
-  // Also reload home if visible
   const homeScr = document.getElementById('home');
   if (homeScr && homeScr.classList.contains('active')) {
     await renderHome();
@@ -182,6 +221,22 @@ export async function saveCurrentWeight() {
   weightLog.push({ d: new Date().toISOString().split('T')[0], w });
   await dbSet('weightLog', weightLog);
   input.value = '';
+  renderProfile();
+}
+
+export function toggleFilterLevel(level) {
+  filterLevel = filterLevel === level ? null : level;
+  renderProfile();
+}
+
+export function toggleFilterGoal(goal) {
+  filterGoal = filterGoal === goal ? null : goal;
+  renderProfile();
+}
+
+export function clearFilters() {
+  filterLevel = null;
+  filterGoal = null;
   renderProfile();
 }
 
