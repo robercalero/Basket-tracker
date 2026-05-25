@@ -993,17 +993,22 @@ function updateProg(){
 async function saveSession(){
   const btn=document.querySelector('button.btn');
   if(btn){btn.innerHTML='⌛ Guardando…';btn.style.opacity='.6';btn.disabled=true}
-  if(!timerPaused&&timerStart){timerAccum+=Math.floor((Date.now()-timerStart)/1000);timerStart=null}
-  SES.note=$('s-note').value;
-  const key=SES.date+'_'+SES.dayIdx;
-  DB.workouts[key]={dayIdx:SES.dayIdx,date:SES.date,sets:SES.sets,warmup:SES.warmup,ts:Date.now(),timerSecs:SES.tSecs};
-  DB.notes[key]=SES.note;
-  Object.assign(DB.prs,SES.newPrs);
-  await saveDB();
-  if(btn){btn.innerHTML='✓ Guardado';btn.style.background='var(--gr2)';btn.style.opacity='1';btn.disabled=false}
-  await new Promise(r=>setTimeout(r,400));
-  clearInterval(SES.tRef);SES.tRef=null;timerStart=null;timerPaused=false;timerAccum=0;
-  restSkip();hideSession();renderHome();
+  try {
+    if(!timerPaused&&timerStart){timerAccum+=Math.floor((Date.now()-timerStart)/1000);timerStart=null}
+    SES.note=$('s-note').value;
+    const key=SES.date+'_'+SES.dayIdx;
+    DB.workouts[key]={dayIdx:SES.dayIdx,date:SES.date,sets:SES.sets,warmup:SES.warmup,ts:Date.now(),timerSecs:SES.tSecs};
+    DB.notes[key]=SES.note;
+    Object.assign(DB.prs,SES.newPrs);
+    await saveDB();
+    if(btn){btn.innerHTML='✓ Guardado';btn.style.background='var(--gr2)';btn.style.opacity='1';btn.disabled=false}
+    await new Promise(r=>setTimeout(r,400));
+    clearInterval(SES.tRef);SES.tRef=null;timerStart=null;timerPaused=false;timerAccum=0;
+    restSkip();hideSession();renderHome();
+  } catch(e){
+    if(btn){btn.innerHTML='✗ Error al guardar';btn.style.background='var(--re2)';btn.style.opacity='1';btn.disabled=false}
+    setTimeout(()=>{if(btn){btn.innerHTML='💾 Guardar sesión';btn.style.background=''} },3000);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
