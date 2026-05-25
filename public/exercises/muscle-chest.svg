@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 280" fill="none">
+  <title>Pecho</title>
+  <!-- Cabeza -->
+  <circle cx="60" cy="18" r="14" fill="#2A2738" stroke="#5A5670" stroke-width="1"/>
+  <!-- Torso -->
+  <path d="M35 40 L30 38 L25 50 L28 65 L30 80 L32 100 L35 130 L40 150 L45 165 L43 175 L38 190 L35 200 L30 220 L30 240 L35 248 L50 250 L60 252 L70 250 L85 248 L90 240 L90 220 L85 200 L82 190 L77 175 L75 165 L80 150 L85 130 L88 100 L90 80 L92 65 L95 50 L90 38 L85 40" fill="#1E1C28" stroke="#5A5670" stroke-width="1"/>
+  <!-- Brazos -->
+  <path d="M25 50 L12 55 L5 60 L3 75 L8 80 L15 75 L20 70 L25 65" fill="#1E1C28" stroke="#5A5670" stroke-width="1"/>
+  <path d="M95 50 L108 55 L115 60 L117 75 L112 80 L105 75 L100 70 L95 65" fill="#1E1C28" stroke="#5A5670" stroke-width="1"/>
+  <!-- Piernas -->
+  <path d="M40 252 L38 265 L36 275 L42 278 L50 275 L52 265 L55 255" fill="#1E1C28" stroke="#5A5670" stroke-width="1"/>
+  <path d="M80 252 L82 265 L84 275 L78 278 L70 275 L68 265 L65 255" fill="#1E1C28" stroke="#5A5670" stroke-width="1"/>
+  <!-- Músculo pecho destacado -->
+  <path d="M38 60 Q35 80 40 100 L45 110 Q48 105 50 95 Q52 80 48 65 Z" fill="#7C5CFC"/>
+  <path d="M82 60 Q85 80 80 100 L75 110 Q72 105 70 95 Q68 80 72 65 Z" fill="#7C5CFC"/>
+  <text x="60" y="270" text-anchor="middle" fill="#8A86A0" font-size="8" font-family="system-ui">Pecho</text>
+</svg>
