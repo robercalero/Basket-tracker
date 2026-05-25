@@ -1,4 +1,4 @@
-﻿const CACHE = "bbt-v4";
+﻿const CACHE = "bbt-v5";
 const FILES = [
   "./index.html",
   "./manifest.json",
