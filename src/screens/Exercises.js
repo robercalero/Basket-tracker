@@ -1,5 +1,5 @@
 import { $ } from '../utils/dom.js';
-import { EXERCISES, MUSCLE_GROUPS, getExercisesGroupedByMuscle, searchExercises } from '../data/exercises/index.js';
+import { EXERCISES, MUSCLE_GROUPS, getExercisesGroupedByMuscle } from '../data/exercises/index.js';
 
 let _activeFilter = null;
 let _searchQuery = '';
@@ -27,9 +27,9 @@ export async function renderExercises() {
       </div>
       <input type="text" id="exSearch" placeholder="Buscar ejercicio..." style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--br);background:var(--sf);color:var(--tx);font-size:14px;margin-bottom:8px">
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
-        <span class="filter-chip ${_activeFilter === null ? 'active' : ''}" onclick="window.filterExercises(null)" style="padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;background:var(--cl);color:var(--tx2)">Todos</span>
+        <span class="filter-chip ${_activeFilter === null ? 'active' : ''}" data-filter="" onclick="window.filterExercises(null)" style="padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;background:var(--cl);color:var(--tx2)">Todos</span>
         ${allGroups.map(g => `
-          <span class="filter-chip ${_activeFilter === g.id ? 'active' : ''}" onclick="window.filterExercises('${g.id}')" style="padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;background:var(--cl);color:var(--tx2)">${g.emoji || '🏋️'} ${g.name}</span>
+          <span class="filter-chip ${_activeFilter === g.id ? 'active' : ''}" data-filter="${g.id}" onclick="window.filterExercises('${g.id}')" style="padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;background:var(--cl);color:var(--tx2)">${g.emoji || '🏋️'} ${g.name}</span>
         `).join('')}
       </div>
     </div>
@@ -97,7 +97,7 @@ function renderExerciseGrid(grouped, allGroups) {
 window.filterExercises = (filter) => {
   _activeFilter = filter;
   const chips = document.querySelectorAll('.filter-chip');
-  chips.forEach(chip => chip.classList.toggle('active', chip.textContent.trim() === (filter || 'Todos')));
+  chips.forEach(chip => chip.classList.toggle('active', (chip.dataset.filter || '') === (filter || '')));
   const grouped = getExercisesGroupedByMuscle();
   const allGroups = MUSCLE_GROUPS.reduce((acc, mg) => {
     if (grouped[mg.id]) acc.push({ ...mg, exercises: grouped[mg.id] });

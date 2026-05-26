@@ -9,12 +9,11 @@ import { findExerciseByName, getVariants } from '../data/exercises/index.js';
 
 export const SES = { idx: -1, sidx: 0, timer: null, paused: false, accum: 0, start: 0, manualSelect: false };
 export let inSession = false;
-export let HF = false;
 let _currentExercises = null;
 
 async function getDayIdx() {
   const dayMap = await dbGet('dayMap', {});
-  return dayMap[todayKey()] ?? new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+  return dayMap[todayKey()] ?? (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
 }
 
 export async function renderSession() {
@@ -23,7 +22,9 @@ export async function renderSession() {
   scr.innerHTML = '';
 
   const planIdx = await dbGet('planIdx', 0);
-  const plan = PLANS[planIdx];
+  const customPlans = await dbGet('customPlans', []);
+  const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
+  const plan = allPlans[planIdx];
   if (!plan || !plan.weeks || !plan.weeks.length) {
     scr.innerHTML = `<div class="card text-center"><div style="font-size:40px;margin-bottom:8px">📋</div><div style="font-weight:700">No hay plan seleccionado</div><p class="text-muted mt-8">Ve a Perfil para elegir un plan</p></div>`;
     scr.classList.add('active');
@@ -111,8 +112,9 @@ export async function renderSession() {
     `;
 
   scr.classList.add('active');
-  HF = false;
 }
+
+let _logSetLock = false;
 
 export async function startSession() {
   if (inSession) return;
@@ -211,96 +213,104 @@ export function showWeightPrompt(exReps, lastData) {
 
 export async function logSet() {
   if (!inSession) return;
-  const planIdx = await dbGet('planIdx', 0);
-  const plan = PLANS[planIdx];
-  if (!plan) return;
-  const { week } = await getCurrentWeek();
-  if (!week) return;
-  const dayIdx = await getDayIdx();
-  const exercises = week.days[dayIdx] || null;
-  if (!exercises || SES.idx >= exercises.length) return;
+  if (_logSetLock) return;
+  _logSetLock = true;
+  try {
+    const planIdx = await dbGet('planIdx', 0);
+    const customPlans = await dbGet('customPlans', []);
+    const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
+    const plan = allPlans[planIdx];
+    if (!plan) return;
+    const { week } = await getCurrentWeek();
+    if (!week) return;
+    const dayIdx = await getDayIdx();
+    const exercises = week.days[dayIdx] || null;
+    if (!exercises || SES.idx >= exercises.length) return;
 
-  const ex = exercises[SES.idx];
-  const log = await dbGet('log', []);
-  let todayLog = log.find(l => l.d === todayKey());
-  if (!todayLog) {
-    todayLog = { d: todayKey(), p: planIdx, dur: 0, ex: [] };
-    log.push(todayLog);
-  }
-
-  let exLog = todayLog.ex.find(e => e.n === ex.name);
-  if (!exLog) {
-    exLog = { n: ex.name, s: 0, w: 0, r: ex.reps, ri: ex.rir, sets: [] };
-    todayLog.ex.push(exLog);
-  }
-
-  // Ask for weight before logging
-  const lastWeight = exLog.w || await dbGet('lastW.' + ex.name, 0);
-  _pendingWeight = lastWeight;
-  _pendingReps = 0;
-
-  // Find last session data for this exercise
-  let lastData = null;
-  for (let i = log.length - 1; i >= 0; i--) {
-    const prevLog = log[i];
-    if (prevLog.d === todayKey()) continue;
-    const prevEx = prevLog.ex?.find(e => e.n === ex.name);
-    if (prevEx && (prevEx.w > 0 || prevEx.sets?.length > 0)) {
-      const lastSet = prevEx.sets?.length > 0 ? prevEx.sets[prevEx.sets.length - 1] : null;
-      lastData = {
-        w: lastSet?.w || prevEx.w || 0,
-        r: lastSet?.r || prevEx.r || 0,
-        d: prevLog.d,
-      };
-      break;
+    const ex = exercises[SES.idx];
+    const log = await dbGet('log', []);
+    let todayLog = log.find(l => l.d === todayKey());
+    if (!todayLog) {
+      todayLog = { d: todayKey(), p: planIdx, dur: 0, ex: [] };
+      log.push(todayLog);
     }
-  }
 
-  const { weight, reps: actualReps } = await showWeightPrompt(ex.reps, lastData);
-
-  exLog.s = (exLog.s || 0) + 1;
-  const wuSets = await dbGet('wu', {});
-  const inWu = wuSets[todayKey()] && SES.sidx === 0;
-
-  exLog.sets.push({
-    idx: exLog.s - 1,
-    w: weight,
-    r: actualReps || ex.reps,
-    ri: ex.rir,
-    wu: inWu,
-    time: Date.now(),
-  });
-
-  // Update exLog.w with actual weight used
-  if (weight > 0) exLog.w = weight;
-
-  await dbSet('log', log);
-  if (weight > 0) await dbSet('lastW.' + ex.name, weight);
-
-  SES.sidx = exLog.s;
-  beep(660, .1);
-
-  // Check if exercise is complete
-  const totalSets = ex.sets * (ex.sets_work ?? 1);
-  const wuTotal = inWu ? 1 : 0;
-  if (exLog.s >= totalSets + wuTotal) {
-    SES.manualSelect = false;
-    // Move to next exercise
-    if (SES.idx + 1 < exercises.length) {
-      SES.idx++;
-      SES.sidx = 0;
-      restStart(exercises[SES.idx]?.name || 'Descanso', 90);
-    } else {
-      // All exercises done
-      if (REST.active) restStop();
-      bPR();
-      inSession = false;
-      if (SES.timer) { clearInterval(SES.timer); SES.timer = null }
-      saveSession();
+    let exLog = todayLog.ex.find(e => e.n === ex.name);
+    if (!exLog) {
+      exLog = { n: ex.name, s: 0, w: 0, r: ex.reps, ri: ex.rir, sets: [] };
+      todayLog.ex.push(exLog);
     }
-  }
 
-  renderSession();
+    // Find last session data for this exercise
+    let lastData = null;
+    for (let i = log.length - 1; i >= 0; i--) {
+      const prevLog = log[i];
+      if (prevLog.d === todayKey()) continue;
+      const prevEx = prevLog.ex?.find(e => e.n === ex.name);
+      if (prevEx && (prevEx.w > 0 || prevEx.sets?.length > 0)) {
+        const lastSet = prevEx.sets?.length > 0 ? prevEx.sets[prevEx.sets.length - 1] : null;
+        lastData = {
+          w: lastSet?.w || prevEx.w || 0,
+          r: lastSet?.r || prevEx.r || 0,
+          d: prevLog.d,
+        };
+        break;
+      }
+    }
+
+    // Ask for weight before logging
+    const lastWeight = exLog.w || await dbGet('lastW.' + ex.name, 0);
+    _pendingWeight = lastWeight;
+    _pendingReps = lastData?.r || 0;
+
+    const { weight, reps: actualReps } = await showWeightPrompt(ex.reps, lastData);
+
+    exLog.s = (exLog.s || 0) + 1;
+    const wuSets = await dbGet('wu', {});
+    const inWu = wuSets[todayKey()] && SES.sidx === 0;
+
+    exLog.sets.push({
+      idx: exLog.s - 1,
+      w: weight,
+      r: actualReps || ex.reps,
+      ri: ex.rir,
+      wu: inWu,
+      time: Date.now(),
+    });
+
+    // Update exLog.w with actual weight used
+    if (weight > 0) exLog.w = weight;
+
+    await dbSet('log', log);
+    if (weight > 0) await dbSet('lastW.' + ex.name, weight);
+
+    SES.sidx = exLog.s;
+    beep(660, .1);
+
+    // Check if exercise is complete
+    const totalSets = (ex.sets || 0) * (ex.sets_work ?? 1);
+    const wuTotal = inWu ? 1 : 0;
+    if (exLog.s >= totalSets + wuTotal) {
+      SES.manualSelect = false;
+      // Move to next exercise
+      if (SES.idx + 1 < exercises.length) {
+        SES.idx++;
+        SES.sidx = 0;
+        restStart(exercises[SES.idx]?.name || 'Descanso', 90);
+      } else {
+        // All exercises done
+        if (REST.active) restStop();
+        bPR();
+        inSession = false;
+        if (SES.timer) { clearInterval(SES.timer); SES.timer = null }
+        await saveSession();
+      }
+    }
+
+    await renderSession();
+  } finally {
+    _logSetLock = false;
+  }
 }
 
 export async function saveSession() {
@@ -314,35 +324,33 @@ export async function saveSession() {
   window.goTab('stats', null);
 }
 
-export function selEx(i) {
+export async function selEx(i) {
   SES.idx = i;
   SES.sidx = 0;
   SES.manualSelect = true;
-  renderSession();
+  await renderSession();
 }
 
-export function swapExercise(variantName) {
+export async function swapExercise(variantName) {
   if (!inSession || !_currentExercises || SES.idx >= _currentExercises.length) return;
 
   const oldEx = _currentExercises[SES.idx];
   _currentExercises[SES.idx] = { ...oldEx, name: variantName };
 
-  // Reset set counter for this exercise since we swapped
   const todayKeyVal = todayKey();
-  dbGet('log', []).then(log => {
-    const todayLog = log.find(l => l.d === todayKeyVal);
-    if (todayLog) {
-      const exLog = todayLog.ex.find(e => e.n === oldEx.name);
-      if (exLog) {
-        exLog.n = variantName;
-        exLog.s = 0;
-        exLog.sets = [];
-        dbSet('log', log);
-      }
+  const log = await dbGet('log', []);
+  const todayLog = log.find(l => l.d === todayKeyVal);
+  if (todayLog) {
+    const exLog = todayLog.ex.find(e => e.n === oldEx.name);
+    if (exLog) {
+      exLog.n = variantName;
+      exLog.s = 0;
+      exLog.sets = [];
+      await dbSet('log', log);
     }
-  });
+  }
 
-  renderSession();
+  await renderSession();
 }
 
 export function getExerciseVariants(exerciseName) {

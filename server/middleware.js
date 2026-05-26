@@ -1,9 +1,8 @@
-function requireDB(req, res) {
+function requireDB(req, res, next) {
   if (!req.dbReady) {
-    res.status(503).json({ error: 'Database not available', status: 'degraded' });
-    return false;
+    return res.status(503).json({ error: 'Database not available', status: 'degraded' });
   }
-  return true;
+  next();
 }
 
 module.exports = { requireDB };

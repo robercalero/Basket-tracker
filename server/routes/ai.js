@@ -72,7 +72,7 @@ function localAdvice(exerciseLog, query, sportId) {
       }
     }
 
-    if (last.r && prev.r && last.r > prev.r && last.w >= prev.w) {
+    if (Number(last.r) && Number(prev.r) && Number(last.r) > Number(prev.r) && last.w >= prev.w) {
       lines.push(`• ${ex.n}: más reps (${prev.r} → ${last.r}) con mismo peso — mejora tu resistencia muscular.`);
     }
   }
@@ -113,7 +113,7 @@ Responde en español. Máximo 3 párrafos. Sé conciso, específico y motivador.
     },
     {
       role: 'user',
-      content: `Datos de mis últimos entrenamientos para ${sport.name}:\n${context || '(sin datos)'}\n\nMi consulta: ${query || '¿Cómo puedo transferir mi progreso del gym a mi rendimiento en ${sport.name}?'}`,
+      content: `Datos de mis últimos entrenamientos para ${sport.name}:\n${context || '(sin datos)'}\n\nMi consulta: ${query || `¿Cómo puedo transferir mi progreso del gym a mi rendimiento en ${sport.name}?`}`,
     },
   ];
 
@@ -145,8 +145,7 @@ Responde en español. Máximo 3 párrafos. Sé conciso, específico y motivador.
   }
 }
 
-router.post('/ai/coach', async (req, res) => {
-  if (!requireDB(req, res)) return;
+router.post('/ai/coach', requireDB, async (req, res) => {
 
   const { exerciseLog, query, sport } = req.body;
   const sportId = sport || 'basketball';

@@ -5,6 +5,7 @@ let syncTimer = null;
 let online = navigator.onLine;
 let lastSyncKey = 'lastSync';
 let _statusListeners = [];
+let _syncing = false;
 
 export function getOnlineStatus() { return online }
 export function onSyncStatus(fn) { _statusListeners.push(fn); return () => { _statusListeners = _statusListeners.filter(f => f !== fn) } }
@@ -29,6 +30,8 @@ export function destroySync() {
 }
 
 export async function doSync() {
+  if (_syncing) return false;
+  _syncing = true;
   notify('syncing');
   try {
     const healthy = await apiHealth();
@@ -42,12 +45,18 @@ export async function doSync() {
 
     // Push local data
     const pushPayload = {
-      workouts: log,
+      workouts: log.map(w => ({ ...w, _synced: true })),
       weightLog,
       profile: profile ? { ...profile, plan_idx: planIdx } : null,
       lastSync,
     };
     await pushData(pushPayload);
+
+    // Mark local entries as synced
+    if (log.length > 0) {
+      const syncedLog = log.map(w => ({ ...w, _synced: true }));
+      await dbSet('log', syncedLog);
+    }
 
     // Pull remote data
     const remote = await pullData(lastSync);
@@ -71,9 +80,11 @@ export async function doSync() {
 
     await dbSet(lastSyncKey, remote.syncedAt || new Date().toISOString());
     notify('online');
+    _syncing = false;
     return true;
   } catch {
     notify('offline');
+    _syncing = false;
     return false;
   }
 }

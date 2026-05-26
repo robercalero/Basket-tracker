@@ -20,7 +20,7 @@ export function analyzeExercise(exLog, planExercise) {
   const lastWeight = last.w
   const prevWeight = prev.w
 
-  if (lastWeight > prevWeight) {
+  if (lastWeight > prevWeight && prevWeight > 0) {
     const pct = ((lastWeight - prevWeight) / prevWeight) * 100
     if (pct >= MIN_PROGRESS_PCT) {
       advice.type = 'progression'
@@ -57,12 +57,12 @@ export function analyzeVolume(exLog, planExercise) {
   if (!exLog || !exLog.sets) return { type: 'no_data', message: 'Sin datos de volumen' }
 
   const sets = exLog.sets
-  const totalVolume = sets.reduce((sum, s) => sum + s.w * (s.r || 0), 0)
+  const totalVolume = sets.reduce((sum, s) => sum + (s.w || 0) * (s.r || 0), 0)
   const avgVolume = totalVolume / sets.length
 
   if (sets.length < 3) return { type: 'too_few', message: 'Pocos sets para analizar volumen', avgVolume }
 
-  const volumes = sets.map(s => s.w * (s.r || 0))
+  const volumes = sets.map(s => (s.w || 0) * (s.r || 0))
   const trend = volumes[volumes.length - 1] - volumes[0]
   const bumpCount = volumes.filter((v, i) => i > 0 && v > volumes[i - 1]).length
 

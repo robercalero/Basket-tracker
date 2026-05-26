@@ -4,87 +4,77 @@ const { pool } = require('../config/db');
 const { requireDB } = require('../middleware');
 
 // POST /api/sync - Receive local changes and merge
-router.post('/sync', async (req, res) => {
-  if (!requireDB(req, res)) return;
-  const { workouts, profile, weightLog, lastSync } = req.body;
-  const conn = await pool.getConnection();
+router.post('/sync', requireDB, async (req, res) => {
+  let conn;
   try {
+    conn = await pool.getConnection();
     await conn.beginTransaction();
+    const { workouts, profile, weightLog, lastSync } = req.body;
 
-    // Upsert profile
     if (profile) {
       await conn.query(
-        `INSERT INTO profile (id, name, gender, dob, height, plan_idx)
-         VALUES (1, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE name=VALUES(name), gender=VALUES(gender),
-           dob=VALUES(dob), height=VALUES(height), plan_idx=VALUES(plan_idx)`,
+        'INSERT INTO profile (id, name, gender, dob, height, plan_idx) VALUES (1, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), gender=VALUES(gender), dob=VALUES(dob), height=VALUES(height), plan_idx=VALUES(plan_idx)',
         [profile.name || '', profile.gender || 'male', profile.dob || null, profile.height || 175, profile.plan_idx ?? 0]
       );
     }
 
-    // Upsert weight log entries
-    if (weightLog && weightLog.length > 0) {
-      for (const w of weightLog) {
-        await conn.query(
-          `INSERT INTO weight_log (date, weight) VALUES (?, ?)
-           ON DUPLICATE KEY UPDATE weight=VALUES(weight)`,
-          [w.d, w.w]
-        );
-      }
-    }
-
-    // Upsert workouts + exercise logs + sets
-    if (workouts && workouts.length > 0) {
+    if (workouts && Array.isArray(workouts)) {
       for (const w of workouts) {
-        await conn.query(
-          `INSERT INTO workouts (date, plan_idx, duration_secs, exercises_completed)
-           VALUES (?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE plan_idx=VALUES(plan_idx),
-             duration_secs=VALUES(duration_secs),
-             exercises_completed=VALUES(exercises_completed)`,
-          [w.d, w.p ?? 0, w.dur ?? 0, w.done ?? 0]
-        );
-        const [[{ id: workoutId }]] = await conn.query('SELECT id FROM workouts WHERE date = ?', [w.d]);
-
-        if (w.ex && w.ex.length > 0) {
+        if (!w.d) continue;
+        const [existing] = await conn.query('SELECT id FROM workouts WHERE date = ?', [w.d]);
+        let workoutId;
+        if (existing.length > 0) {
+          workoutId = existing[0].id;
+          await conn.query('UPDATE workouts SET plan_idx = ?, duration_secs = ?, exercises_completed = ? WHERE id = ?',
+            [w.planIdx ?? 0, w.dur || 0, w.done || 0, workoutId]);
           await conn.query('DELETE FROM exercise_logs WHERE workout_id = ?', [workoutId]);
+        } else {
+          const r = await conn.query('INSERT INTO workouts (date, plan_idx, duration_secs, exercises_completed) VALUES (?, ?, ?, ?)',
+            [w.d, w.planIdx ?? 0, w.dur || 0, w.done || 0]);
+          workoutId = r[0].insertId;
+        }
+        if (w.ex && Array.isArray(w.ex)) {
           for (const ex of w.ex) {
-            const [exResult] = await conn.query(
-              `INSERT INTO exercise_logs (workout_id, exercise_name, sets_completed, max_weight)
-               VALUES (?, ?, ?, ?)`,
-              [workoutId, ex.n, ex.s || 0, ex.w || 0]
-            );
-            const exLogId = exResult.insertId;
-
-            if (ex.sets && ex.sets.length > 0) {
-              const setValues = ex.sets.map(s => [
-                exLogId, s.idx ?? 0, s.w || 0, s.r || '', s.ri || 0, s.wu ? 1 : 0, s.time || 0
-              ]);
-              await conn.query(
-                `INSERT INTO exercise_sets (exercise_log_id, set_index, weight, reps, rir, is_warmup, logged_at)
-                 VALUES ?`,
-                [setValues]
-              );
+            const r = await conn.query('INSERT INTO exercise_logs (workout_id, exercise_name, sets_completed, max_weight) VALUES (?, ?, ?, ?)',
+              [workoutId, ex.n || '', ex.s || 0, ex.maxW ?? 0]);
+            const exLogId = r[0].insertId;
+            if (ex.sets && Array.isArray(ex.sets)) {
+              for (let i = 0; i < ex.sets.length; i++) {
+                const s = ex.sets[i];
+                await conn.query('INSERT INTO exercise_sets (exercise_log_id, set_index, weight, reps, rir, is_warmup, logged_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  [exLogId, i, s.w || 0, String(s.r ?? ''), s.rir ?? 0, s.wu ? 1 : 0, s.t ?? Date.now()]);
+              }
             }
           }
         }
       }
     }
 
+    if (weightLog && Array.isArray(weightLog)) {
+      for (const w of weightLog) {
+        if (!w.d || w.w == null) continue;
+        await conn.query('INSERT INTO weight_log (date, weight) VALUES (?, ?) ON DUPLICATE KEY UPDATE weight = VALUES(weight)',
+          [w.d, w.w]);
+      }
+    }
+
     await conn.commit();
-    res.json({ success: true, syncedAt: new Date().toISOString() });
+    res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) {
+      try { await conn.rollback(); } catch (rollbackErr) {
+        console.error('Rollback failed:', rollbackErr.message);
+      }
+    }
     console.error('Sync error:', err);
     res.status(500).json({ error: 'Sync failed' });
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
 // GET /api/sync?since=ISO_DATE - Pull all data changed since timestamp
-router.get('/sync', async (req, res) => {
-  if (!requireDB(req, res)) return;
+router.get('/sync', requireDB, async (req, res) => {
   const since = req.query.since || '2000-01-01';
   try {
     const [profileRows] = await pool.query('SELECT * FROM profile WHERE id = 1');

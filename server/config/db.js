@@ -41,8 +41,10 @@ async function initDB() {
     throw err;
   }
   try {
-    await conn.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME || 'basket_tracker'}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-  } catch { /* TiDB Cloud might restrict CREATE DATABASE; using 'sys' as fallback */ }
+    await conn.query(`CREATE DATABASE IF NOT EXISTS \`${(process.env.DB_NAME || 'basket_tracker').replace(/`/g, '')}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  } catch (err) {
+    console.warn('Could not create database (TiDB Cloud may restrict this):', err.message);
+  }
   await conn.end();
 
   const sql = `

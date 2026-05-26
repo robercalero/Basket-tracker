@@ -2,6 +2,7 @@ import { $ } from '../utils/dom.js';
 import { fmtDate } from '../utils/format.js';
 import { dbGet } from '../services/storage.js';
 import { renderChart } from '../components/Chart.js';
+import { PLANS } from '../data/plans/index.js';
 
 export async function renderStats() {
   const scr = $('stats');
@@ -11,7 +12,6 @@ export async function renderStats() {
   const log = await dbGet('log', []);
   const planIdx = await dbGet('planIdx', 0);
   const customPlans = await dbGet('customPlans', []);
-  const { PLANS } = await import('../data/plans/index.js');
   const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
   const plan = allPlans[planIdx] || { name: 'Plan' };
 
@@ -25,9 +25,13 @@ export async function renderStats() {
   // Current streak
   let streak = 0;
   const d = new Date();
+  const off = d.getTimezoneOffset();
+  const todayLocal = new Date(d.getTime() - off * 60000).toISOString().split('T')[0];
   for (let i = 0; i < 365; i++) {
     const key = d.toISOString().split('T')[0];
-    if (log.find(l => l.d === key)) { streak++ } else if (i > 0) break;
+    if (log.find(l => l.d === key)) {
+      if (key === todayLocal || streak > 0) streak++;
+    } else if (i > 0) break;
     d.setDate(d.getDate() - 1);
   }
 

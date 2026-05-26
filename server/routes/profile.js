@@ -3,8 +3,7 @@ const router = express.Router();
 const { pool } = require('../config/db');
 const { requireDB } = require('../middleware');
 
-router.get('/profile', async (req, res) => {
-  if (!requireDB(req, res)) return;
+router.get('/profile', requireDB, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM profile WHERE id = 1');
     res.json(rows[0] || { id: 1, name: '', gender: 'male', height: 175, plan_idx: 0 });
@@ -13,8 +12,7 @@ router.get('/profile', async (req, res) => {
   }
 });
 
-router.put('/profile', async (req, res) => {
-  if (!requireDB(req, res)) return;
+router.put('/profile', requireDB, async (req, res) => {
   const { name, gender, dob, height, plan_idx } = req.body;
   try {
     await pool.query(

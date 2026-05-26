@@ -83,7 +83,7 @@ window.doSwap = async (variantName) => {
   if (overlay) overlay.remove();
   // Import and call swapExercise
   const { swapExercise, renderSession } = await import('./screens/Session.js');
-  swapExercise(variantName);
+  await swapExercise(variantName);
   await renderSession();
 };
 window.restAdd = restAdd;
@@ -100,7 +100,15 @@ window.exportData = async () => {
   const { dbGet, dbKeys } = await import('./services/storage.js');
   const keys = await dbKeys();
   const data = {};
-  for (const key of keys) data[key] = await dbGet(key);
+  for (const key of keys) {
+    const val = await dbGet(key);
+    // Strip internal _synced flag so re-import triggers fresh sync
+    if (key === 'log' && Array.isArray(val)) {
+      data[key] = val.map(w => { const { _synced, ...rest } = w; return rest });
+    } else {
+      data[key] = val;
+    }
+  }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

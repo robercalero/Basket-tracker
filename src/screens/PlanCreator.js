@@ -1,6 +1,4 @@
 import { $ } from '../utils/dom.js';
-import { dbGet } from '../services/storage.js';
-import { PLANS } from '../data/plans/index.js';
 
 let editingPlan = null;
 
@@ -172,6 +170,13 @@ window.removeDay = function(di) {
   const daysContainer = document.getElementById('pcDaysList');
   const dayEl = daysContainer?.children[di];
   if (dayEl) dayEl.remove();
+  // Renumber remaining days
+  requestAnimationFrame(() => {
+    Array.from(daysContainer?.children || []).forEach((el, i) => {
+      const label = el.querySelector('strong');
+      if (label) label.textContent = `Día ${i + 1}`;
+    });
+  });
 };
 
 window.addExercise = function(di) {

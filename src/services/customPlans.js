@@ -1,4 +1,5 @@
 import { dbGet, dbSet, dbDel } from './storage.js';
+import { PLANS } from '../data/plans/index.js';
 
 const CUSTOM_PLANS_KEY = 'customPlans';
 
@@ -27,11 +28,10 @@ export async function deleteCustomPlan(id) {
 }
 
 export async function getAllPlans() {
-  const builtIn = await import('../data/plans/index.js');
   const custom = await getCustomPlans();
-  const offset = builtIn.PLANS.length;
+  const offset = PLANS.length;
   return {
-    plans: [...builtIn.PLANS, ...custom.map(p => ({ ...p, custom: true }))],
-    builtInCount: builtIn.PLANS.length,
+    plans: [...PLANS, ...custom.map(p => ({ ...p, custom: true }))],
+    builtInCount: PLANS.length,
   };
 }

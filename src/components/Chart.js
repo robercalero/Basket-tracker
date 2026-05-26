@@ -19,7 +19,9 @@ export async function renderChart(canvasId, exName, maxPoints = 20, color = '#7C
   ctx.clearRect(0, 0, w, h);
 
   const planIdx = await dbGet('planIdx', 0);
-  const plan = PLANS[planIdx];
+  const customPlans = await dbGet('customPlans', []);
+  const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
+  const plan = allPlans[planIdx];
   if (!plan) return;
 
   const logs = await dbGet('log', []);
@@ -50,7 +52,7 @@ export async function renderChart(canvasId, exName, maxPoints = 20, color = '#7C
 
   points.forEach((p, i) => {
     const x = pad.l + (i / (points.length - 1)) * gw;
-    const y = pad.t + (1 - (p.w - minW) / (maxW - minW)) * gh;
+    const y = pad.t + (1 - (p.w - minW) / (Math.max(maxW - minW, 1))) * gh;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
@@ -67,7 +69,7 @@ export async function renderChart(canvasId, exName, maxPoints = 20, color = '#7C
   points.forEach((p, i) => {
     if (i % Math.max(1, Math.floor(points.length / 5)) !== 0) return;
     const x = pad.l + (i / (points.length - 1)) * gw;
-    ctx.fillText(fmtDate(new Date(p.date + 'T12:00:00')), x, h - 4);
+    ctx.fillText(fmtDate(p.date), x, h - 4);
   });
 
   ctx.fillStyle = '#E8E6F0';

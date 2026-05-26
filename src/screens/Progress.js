@@ -74,7 +74,9 @@ export async function renderProgress() {
         scr.appendChild(coachCard);
       }
     }
-  } catch {}
+  } catch (err) {
+    console.warn('Coach AI error:', err);
+  }
 
   // Aggregate exercises across all logs
   const exMap = {};

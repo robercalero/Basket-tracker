@@ -48,7 +48,7 @@ export function restStart(exName, secs) {
 }
 
 function restTick() {
-  const left = Math.max(0, Math.round((REST.endTime - Date.now()) / 1000));
+  const left = Math.max(0, Math.ceil((REST.endTime - Date.now()) / 1000));
   const el = $('restTime');
   const ring = document.getElementById('restRing');
   if (el) el.textContent = fmtSecs(left);

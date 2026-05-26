@@ -3,7 +3,6 @@ import { dbGet, dbSet, dbDel } from '../services/storage.js';
 import { PLANS } from '../data/plans/index.js';
 import { renderHome } from './Home.js';
 import { getCurrentWeek, advanceWeek } from '../services/planUtils.js';
-import { deleteCustomPlan } from '../services/customPlans.js';
 import { SPORTS } from '../data/sports.js';
 
 const LEVELS = ['beginner', 'intermediate', 'advanced'];
@@ -124,7 +123,6 @@ export async function renderProfile() {
         ${filteredPlans.length === 0 ? '<div style="color:var(--tx3);font-size:13px;text-align:center;padding:12px">Ningún plan coincide con los filtros</div>' : ''}
       </div>
       <button class="btn btn-sm btn-ghost btn-block" onclick="window.startPlanCreator()" style="margin-top:8px;font-size:12px">+ Crear plan personalizado</button>
-      </div>
     </div>`;
 
   if (plan && plan.weeks && plan.weeks.length > 1) {
@@ -243,6 +241,8 @@ export function clearFilters() {
 function renderWeightChart(weightLog) {
   const canvas = document.getElementById('weightChart');
   if (!canvas) return;
+  const data = weightLog.slice(-20);
+  if (data.length < 2) return;
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.parentElement.getBoundingClientRect();
@@ -253,7 +253,6 @@ function renderWeightChart(weightLog) {
 
   ctx.clearRect(0, 0, w, h);
 
-  const data = weightLog.slice(-20);
   const maxW = Math.max(...data.map(d => d.w));
   const minW = Math.min(...data.map(d => d.w));
   const pad = 8;

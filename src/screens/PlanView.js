@@ -1,6 +1,7 @@
 import { $ } from '../utils/dom.js';
 import { dbGet } from '../services/storage.js';
 import { getCurrentWeek } from '../services/planUtils.js';
+import { PLANS } from '../data/plans/index.js';
 
 export async function renderPlanView() {
   const scr = $('planView');
@@ -9,7 +10,7 @@ export async function renderPlanView() {
 
   const planIdx = await dbGet('planIdx', 0);
   const customPlans = await dbGet('customPlans', []);
-  const allPlans = [...(await import('../data/plans/index.js')).PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
+  const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
   const plan = allPlans[planIdx];
   if (!plan) {
     scr.innerHTML = '<div class="card text-center"><p>Selecciona un plan en Perfil</p></div>';

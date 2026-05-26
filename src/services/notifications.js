@@ -12,8 +12,8 @@ export async function reqNotif() {
 export function sendNotif(title, body) {
   if (!notifPerm) return;
   try {
-    const n = new Notification(title, { body, icon: 'icons/icon-192.png', tag: 'bbt-rest' });
+    const n = new Notification(title, { body, icon: '/icons/icon-192.png', tag: 'bbt-rest' });
     setTimeout(() => n.close(), 5000);
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-  } catch (e) { }
+  } catch (e) { console.warn('Notification failed:', e) }
 }

@@ -65,10 +65,24 @@ async function start() {
     console.warn('  Fix: Configure .env with MySQL/TiDB Cloud credentials or run the server later.');
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     if (!dbReady) console.log('  Health: http://localhost:' + PORT + '/api/health');
   });
+
+  server.on('error', (err) => {
+    console.error('Server failed to start:', err.message);
+    process.exit(1);
+  });
 }
+
+function gracefulShutdown() {
+  console.log('\nShutting down gracefully...');
+  pool.end().catch(() => {});
+  process.exit(0);
+}
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 start();

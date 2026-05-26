@@ -8,14 +8,14 @@ function getACtx() {
 export function beep(freq = 880, dur = .15, vol = .35) {
   try {
     const ctx = getACtx();
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.connect(g); g.connect(ctx.destination);
     o.frequency.value = freq; o.type = 'sine';
     g.gain.setValueAtTime(vol, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + dur);
     o.start(); o.stop(ctx.currentTime + dur);
-  } catch { }
+  } catch (e) { console.warn('beep failed:', e) }
 }
 
 export const bDone = () => { beep(660, .1); setTimeout(() => beep(880, .2), 120) };

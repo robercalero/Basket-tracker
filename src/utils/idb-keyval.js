@@ -18,8 +18,11 @@ function openDB() {
 }
 
 let _db = null;
+let _dbPromise = null;
 async function getDB() {
-  if (!_db) _db = await openDB();
+  if (_db) return _db;
+  if (!_dbPromise) _dbPromise = openDB();
+  _db = await _dbPromise;
   return _db;
 }
 

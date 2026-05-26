@@ -33,9 +33,8 @@ export async function renderExerciseDetail(exerciseId) {
       </div>
 
       ${ex.image ? `<div class="exercise-detail-img">
-        <img src="/exercises/${ex.image}" alt="${ex.name}" onerror="this.style.display='none'">
-      </div>` : ''}
-      ${muscleInfo?.emoji && !ex.image ? `<div class="exercise-detail-img" style="font-size:64px">${muscleInfo.emoji}</div>` : ''}
+        <img src="/exercises/${ex.image}" alt="${ex.name}" onerror="this.onerror=null;this.src='/exercises/muscle-${ex.muscleGroup}.svg'">
+      </div>` : muscleInfo?.emoji ? `<div class="exercise-detail-img" style="font-size:64px">${muscleInfo.emoji}</div>` : `<div class="exercise-detail-img"><img src="/exercises/muscle-${ex.muscleGroup}.svg" alt="${muscleLabel}" style="opacity:0.6"></div>`}
 
       <p style="font-size:14px;color:var(--tx);line-height:1.6;margin-bottom:12px">${ex.description}</p>
 
