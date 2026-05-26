@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { requireDB } = require('../middleware');
 
 const LLM_API_KEY = process.env.LLM_API_KEY || '';
 const LLM_ENDPOINT = process.env.LLM_ENDPOINT || 'https://api.openai.com/v1/chat/completions';
@@ -145,7 +144,7 @@ Responde en español. Máximo 3 párrafos. Sé conciso, específico y motivador.
   }
 }
 
-router.post('/ai/coach', requireDB, async (req, res) => {
+router.post('/ai/coach', async (req, res) => {
 
   const { exerciseLog, query, sport } = req.body;
   const sportId = sport || 'basketball';
@@ -168,7 +167,7 @@ router.post('/ai/coach', requireDB, async (req, res) => {
   }
 });
 
-router.post('/ai/generate-plan', requireDB, async (req, res) => {
+router.post('/ai/generate-plan', async (req, res) => {
   const { sport, goal, level, daysPerWeek } = req.body;
 
   const sportId = sport || 'general';
