@@ -12,6 +12,7 @@ const GOAL_NAMES = { hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 
 
 let filterLevel = null;
 let filterGoal = null;
+let filterSport = null;
 
 export async function renderProfile() {
   const scr = $('profile');
@@ -29,6 +30,8 @@ export async function renderProfile() {
   const filteredPlans = allPlans.filter(p => {
     if (filterLevel && p.level !== filterLevel) return false;
     if (filterGoal && p.goal !== filterGoal) return false;
+    if (filterSport && p.recommendedSports && !p.recommendedSports.includes(filterSport) && !p.recommendedSports.includes('general')) return false;
+    if (filterSport && !p.recommendedSports) return false;
     return true;
   });
 
@@ -97,7 +100,45 @@ export async function renderProfile() {
         ${GOALS.map(g => `
           <span class="filter-chip" style="padding:4px 12px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:12px;cursor:pointer${filterGoal === g ? ' active' : ''}" onclick="window.toggleFilterGoal('${g}')">${GOAL_NAMES[g]}</span>
         `).join('')}
-        ${(filterLevel || filterGoal) ? '<span style="padding:4px 12px;border-radius:6px;background:transparent;border:1px solid var(--re);font-size:11px;cursor:pointer;color:var(--re)" onclick="window.clearFilters()">✕ Limpiar filtros</span>' : ''}
+        <span style="font-size:11px;color:var(--tx3);padding:4px 0;width:100%;margin-top:4px">Filtrar por deporte:</span>
+        ${SPORTS.map(s => `
+          <span class="filter-chip" style="padding:4px 12px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:12px;cursor:pointer${filterSport === s.id ? ' active' : ''}" onclick="window.toggleFilterSport('${s.id}')">${s.emoji} ${s.name}</span>
+        `).join('')}
+        ${(filterLevel || filterGoal || filterSport) ? '<span style="padding:4px 12px;border-radius:6px;background:transparent;border:1px solid var(--re);font-size:11px;cursor:pointer;color:var(--re)" onclick="window.clearFilters()">✕ Limpiar filtros</span>' : ''}
+      </div>
+      <div id="aiPlanGen" style="display:none;margin:12px 0;padding:12px;background:var(--sf);border-radius:10px;border:1px solid var(--ac)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px">🤖 Generar Plan con IA</div>
+        <div class="profile-field">
+          <label>Objetivo</label>
+          <select id="aiGoal">
+            <option value="hypertrophy" ${(filterGoal || 'hypertrophy') === 'hypertrophy' ? 'selected' : ''}>Hipertrofia</option>
+            <option value="strength" ${filterGoal === 'strength' ? 'selected' : ''}>Fuerza</option>
+            <option value="endurance" ${filterGoal === 'endurance' ? 'selected' : ''}>Resistencia</option>
+          </select>
+        </div>
+        <div class="profile-field">
+          <label>Nivel</label>
+          <select id="aiLevel">
+            <option value="beginner" ${(filterLevel || 'intermediate') === 'beginner' ? 'selected' : ''}>Principiante</option>
+            <option value="intermediate" ${(filterLevel || 'intermediate') === 'intermediate' ? 'selected' : ''}>Intermedio</option>
+            <option value="advanced" ${filterLevel === 'advanced' ? 'selected' : ''}>Avanzado</option>
+          </select>
+        </div>
+        <div class="profile-field">
+          <label>Días / semana</label>
+          <select id="aiDays">
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn btn-primary btn-block" onclick="window.generateAIPlan()" id="aiGenBtn">🤖 Generar Plan</button>
+          <button class="btn btn-ghost" onclick="window.closeAIPlanGen()">Cancelar</button>
+        </div>
+        <div id="aiGenStatus" style="font-size:12px;color:var(--tx2);margin-top:6px"></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${filteredPlans.map((p, i) => {
@@ -123,6 +164,7 @@ export async function renderProfile() {
         ${filteredPlans.length === 0 ? '<div style="color:var(--tx3);font-size:13px;text-align:center;padding:12px">Ningún plan coincide con los filtros</div>' : ''}
       </div>
       <button class="btn btn-sm btn-ghost btn-block" onclick="window.startPlanCreator()" style="margin-top:8px;font-size:12px">+ Crear plan personalizado</button>
+      <button class="btn btn-sm btn-primary btn-block" onclick="window.showAIPlanGen()" style="margin-top:4px;font-size:12px">🤖 Generar Plan con IA</button>
     </div>`;
 
   if (plan && plan.weeks && plan.weeks.length > 1) {
@@ -177,6 +219,7 @@ export async function saveProfileField(field, value) {
   const profile = await dbGet('profile', { name: '', gender: 'male', dob: '', height: 175, sport: 'basketball' });
   profile[field] = value;
   if (field === 'height') profile[field] = parseFloat(value) || 175;
+  if (field === 'sport') filterSport = value;
   await dbSet('profile', profile);
   renderProfile();
 }
@@ -227,6 +270,58 @@ export function toggleFilterLevel(level) {
   renderProfile();
 }
 
+window.showAIPlanGen = function() {
+  const gen = document.getElementById('aiPlanGen');
+  if (gen) gen.style.display = 'block';
+}
+
+window.closeAIPlanGen = function() {
+  const gen = document.getElementById('aiPlanGen');
+  if (gen) gen.style.display = 'none';
+  const status = document.getElementById('aiGenStatus');
+  if (status) status.textContent = '';
+}
+
+window.generateAIPlan = async function() {
+  const profile = await dbGet('profile', { name: '', sport: 'basketball' });
+  const goal = document.getElementById('aiGoal')?.value || 'hypertrophy';
+  const level = document.getElementById('aiLevel')?.value || 'intermediate';
+  const days = parseInt(document.getElementById('aiDays')?.value) || 3;
+  const btn = document.getElementById('aiGenBtn');
+  const status = document.getElementById('aiGenStatus');
+
+  if (!btn || !status) return;
+  btn.disabled = true;
+  btn.textContent = 'Generando...';
+  status.textContent = 'Generando plan...';
+
+  try {
+    const { generatePlan } = await import('../services/planGenerator.js');
+    const plan = generatePlan({ sport: profile.sport, goal, level, daysPerWeek: days });
+    const { saveCustomPlan } = await import('../services/customPlans.js');
+    await saveCustomPlan(plan);
+    await dbSet('customPlanId', plan.id);
+    status.textContent = '✅ Plan generado. Activándolo...';
+    await renderProfile();
+    const homeScr = document.getElementById('home');
+    if (homeScr && homeScr.classList.contains('active')) {
+      const { renderHome } = await import('./Home.js');
+      await renderHome();
+    }
+  } catch (err) {
+    status.textContent = '❌ Error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🤖 Generar Plan';
+    window.closeAIPlanGen();
+  }
+}
+
+window.toggleFilterSport = function(sport) {
+  filterSport = filterSport === sport ? null : sport;
+  renderProfile();
+}
+
 export function toggleFilterGoal(goal) {
   filterGoal = filterGoal === goal ? null : goal;
   renderProfile();
@@ -235,6 +330,7 @@ export function toggleFilterGoal(goal) {
 export function clearFilters() {
   filterLevel = null;
   filterGoal = null;
+  filterSport = null;
   renderProfile();
 }
 

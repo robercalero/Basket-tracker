@@ -10,6 +10,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'hypertrophy',
     daysPerWeek: 6,
+    recommendedSports: ['general', 'crossfit'],
     weeks: [
       {
         label: 'Semana 1-3 (Fuerza)',
@@ -131,6 +132,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'hypertrophy',
     daysPerWeek: 4,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Hipertrofia)',
@@ -187,6 +189,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'hypertrophy',
     daysPerWeek: 6,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-6 (Volumen)',
@@ -234,6 +237,7 @@ export const PLANS = [
     level: 'advanced',
     goal: 'strength',
     daysPerWeek: 6,
+    recommendedSports: ['general', 'crossfit'],
     weeks: [
       {
         label: 'Semana 1-3 (Fuerza)',
@@ -355,6 +359,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'hypertrophy',
     daysPerWeek: 3,
+    recommendedSports: ['general', 'basketball', 'football', 'running', 'tennis'],
     weeks: [
       {
         label: 'Semana 1-4 (Adaptación)',
@@ -402,6 +407,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'hypertrophy',
     daysPerWeek: 3,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Fundamentos)',
@@ -449,6 +455,7 @@ export const PLANS = [
     level: 'advanced',
     goal: 'strength',
     daysPerWeek: 4,
+    recommendedSports: ['general', 'basketball', 'football'],
     weeks: [
       {
         label: 'Semana 1-4 (Ciclo 1)',
@@ -493,6 +500,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'strength',
     daysPerWeek: 4,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4',
@@ -543,6 +551,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'strength',
     daysPerWeek: 3,
+    recommendedSports: ['general', 'basketball', 'football'],
     weeks: [
       {
         label: 'Semana 1-4 (Lineal)',
@@ -575,6 +584,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'endurance',
     daysPerWeek: 3,
+    recommendedSports: ['general', 'running', 'basketball', 'football', 'tennis'],
     weeks: [
       {
         label: 'Semana 1-4 (Resistencia)',
@@ -622,6 +632,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'hypertrophy',
     daysPerWeek: 3,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Fundamentos)',
@@ -660,6 +671,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'hypertrophy',
     daysPerWeek: 4,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Hipertrofia)',
@@ -710,6 +722,7 @@ export const PLANS = [
     level: 'advanced',
     goal: 'hypertrophy',
     daysPerWeek: 6,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Volumen)',
@@ -777,6 +790,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'hypertrophy',
     daysPerWeek: 5,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Volumen)',
@@ -833,6 +847,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'strength',
     daysPerWeek: 4,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Fuerza + Volumen)',
@@ -881,6 +896,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'strength',
     daysPerWeek: 3,
+    recommendedSports: ['general', 'basketball', 'football'],
     weeks: [
       {
         label: 'Semana 1-8 (Lineal)',
@@ -913,6 +929,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'strength',
     daysPerWeek: 3,
+    recommendedSports: ['general', 'basketball', 'football'],
     weeks: [
       {
         label: 'Semana 1-12 (Novato)',
@@ -948,6 +965,7 @@ export const PLANS = [
     level: 'advanced',
     goal: 'hypertrophy',
     daysPerWeek: 5,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-6 (Volumen Extremo)',
@@ -998,6 +1016,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'hypertrophy',
     daysPerWeek: 4,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Adaptación)',
@@ -1046,6 +1065,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'hypertrophy',
     daysPerWeek: 3,
+    recommendedSports: ['general', 'running', 'basketball'],
     weeks: [
       {
         label: 'Semana 1-4 (Calistenia)',
@@ -1087,6 +1107,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'endurance',
     daysPerWeek: 4,
+    recommendedSports: ['general', 'crossfit', 'basketball', 'football', 'tennis', 'running'],
     weeks: [
       {
         label: 'Semana 1-4 (Quema)',
@@ -1135,6 +1156,7 @@ export const PLANS = [
     level: 'beginner',
     goal: 'hypertrophy',
     daysPerWeek: 4,
+    recommendedSports: ['general', 'running'],
     weeks: [
       {
         label: 'Semana 1-4 (Viajero)',
@@ -1183,6 +1205,7 @@ export const PLANS = [
     level: 'advanced',
     goal: 'strength',
     daysPerWeek: 4,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Fuerza)',
@@ -1234,6 +1257,7 @@ export const PLANS = [
     level: 'advanced',
     goal: 'strength',
     daysPerWeek: 4,
+    recommendedSports: ['general', 'basketball', 'football'],
     weeks: [
       {
         label: 'Ciclo 1 (Fuerza + Volumen)',
@@ -1278,6 +1302,7 @@ export const PLANS = [
     level: 'advanced',
     goal: 'hypertrophy',
     daysPerWeek: 6,
+    recommendedSports: ['general', 'crossfit'],
     weeks: [
       {
         label: 'Semana 1-4 (Intensidad)',
@@ -1345,6 +1370,7 @@ export const PLANS = [
     level: 'intermediate',
     goal: 'hypertrophy',
     daysPerWeek: 5,
+    recommendedSports: ['general'],
     weeks: [
       {
         label: 'Semana 1-4 (Hipertrofia)',

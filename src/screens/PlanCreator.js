@@ -1,4 +1,5 @@
 import { $ } from '../utils/dom.js';
+import { SPORTS } from '../data/sports.js';
 
 let editingPlan = null;
 
@@ -40,6 +41,12 @@ export async function renderPlanCreator() {
           </select>
         </div>
         <div class="profile-field" style="flex:1">
+          <label>Deporte</label>
+          <select id="pcSport">
+            ${SPORTS.map(s => `<option value="${s.id}" ${(plan.recommendedSports && plan.recommendedSports[0] === s.id) ? 'selected' : s.id === 'general' ? 'selected' : ''}>${s.emoji} ${s.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="profile-field" style="flex:1">
           <label>Días/semana</label>
           <input type="number" id="pcDays" value="${plan.daysPerWeek || 3}" min="1" max="7">
         </div>
@@ -69,13 +76,14 @@ function getDefaultPlan() {
     level: 'intermediate',
     goal: 'hypertrophy',
     daysPerWeek: 3,
+    recommendedSports: ['general'],
     weeks: [{
       label: 'Semana 1',
       phase: 'custom',
       days: [
         [{ name: 'Press Banca Plano', sets: 3, reps: '10', rir: 1, rest: 90 }],
-        [{ name: 'Remo Barra', sets: 3, reps: '10', rir: 1, rest: 90 }],
-        [{ name: 'Sentadilla', sets: 3, reps: '10', rir: 1, rest: 120 }],
+        [{ name: 'Remo con Barra', sets: 3, reps: '10', rir: 1, rest: 90 }],
+        [{ name: 'Sentadilla con Barra', sets: 3, reps: '10', rir: 1, rest: 120 }],
       ],
     }],
   };
@@ -109,6 +117,7 @@ function collectPlanFromUI() {
   const name = document.getElementById('pcName')?.value?.trim();
   if (!name) { alert('El nombre del plan es obligatorio'); return null }
 
+  const sport = document.getElementById('pcSport')?.value || 'general';
   const plan = {
     id: editingPlan?.id || 'custom_' + Date.now(),
     name,
@@ -117,6 +126,7 @@ function collectPlanFromUI() {
     level: document.getElementById('pcLevel')?.value || 'intermediate',
     goal: document.getElementById('pcGoal')?.value || 'hypertrophy',
     daysPerWeek: parseInt(document.getElementById('pcDays')?.value) || 3,
+    recommendedSports: [sport],
     weeks: [{
       label: 'Semana 1',
       phase: 'custom',

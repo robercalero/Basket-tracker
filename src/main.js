@@ -266,6 +266,40 @@ async function showOnboarding() {
   });
 }
 
+// Coach AI query
+window.askCoach = async () => {
+  const btn = document.getElementById('coachAskBtn');
+  const input = document.getElementById('coachQuery');
+  const responseDiv = document.getElementById('coachResponse');
+  const query = input?.value?.trim();
+  if (!query || !btn) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Pensando...';
+  responseDiv.style.display = 'none';
+
+  try {
+    const log = await dbGet('log', []);
+    const profile = await dbGet('profile', { sport: 'basketball' });
+    const exerciseLog = log.filter(l => l.ex?.length > 0).slice(-10).flatMap(l => l.ex);
+
+    const r = await fetch('/api/ai/coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exerciseLog, query, sport: profile.sport || 'basketball' }),
+    });
+    const data = await r.json();
+    responseDiv.textContent = data.advice || 'Sin respuesta del coach. Intenta de nuevo.';
+    responseDiv.style.display = 'block';
+  } catch (err) {
+    responseDiv.textContent = 'Error al consultar al coach. Verifica tu conexión e intenta de nuevo.';
+    responseDiv.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Preguntar';
+  }
+};
+
 // PWA install prompt
 window.__deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {

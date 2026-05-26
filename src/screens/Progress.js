@@ -78,6 +78,16 @@ export async function renderProgress() {
     console.warn('Coach AI error:', err);
   }
 
+  // Coach query section
+  const coachQueryCard = div('card');
+  coachQueryCard.innerHTML = `
+    <div style="font-size:12px;color:var(--tx2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🤖 Preguntar al Coach</div>
+    <textarea id="coachQuery" rows="2" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--sf);color:var(--tx);font-size:13px;resize:none;box-sizing:border-box" placeholder="Ej: ¿Cómo mejorar mi salto vertical?"></textarea>
+    <button class="btn btn-sm btn-primary btn-block" onclick="window.askCoach()" id="coachAskBtn" style="margin-top:6px">Preguntar</button>
+    <div id="coachResponse" style="display:none;margin-top:8px;padding:8px;background:var(--sf);border-radius:8px;font-size:12px;line-height:1.5;white-space:pre-wrap"></div>
+  `;
+  scr.appendChild(coachQueryCard);
+
   // Aggregate exercises across all logs
   const exMap = {};
   log.forEach(l => {

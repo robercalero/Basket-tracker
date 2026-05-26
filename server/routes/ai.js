@@ -168,4 +168,197 @@ router.post('/ai/coach', requireDB, async (req, res) => {
   }
 });
 
+router.post('/ai/generate-plan', requireDB, async (req, res) => {
+  const { sport, goal, level, daysPerWeek } = req.body;
+
+  const sportId = sport || 'general';
+
+  try {
+    let plan = await llmGeneratePlan({ sport: sportId, goal, level, daysPerWeek });
+
+    if (!plan) {
+      plan = localGeneratePlan({ sport: sportId, goal, level, daysPerWeek });
+    }
+
+    res.json({ plan, source: plan.source || 'local', sport: sportId });
+  } catch (err) {
+    console.error('Plan generation error:', err.message);
+    const fallback = localGeneratePlan({ sport: sportId, goal, level, daysPerWeek });
+    res.json({ plan: fallback, source: 'local', sport: sportId });
+  }
+});
+
+async function llmGeneratePlan({ sport, goal, level, daysPerWeek }) {
+  if (!LLM_API_KEY) return null;
+
+  const sportInfo = SPORTS[sport] || SPORTS.general;
+  const days = daysPerWeek || 3;
+  const lvl = level || 'intermediate';
+  const g = goal || 'hypertrophy';
+
+  const messages = [
+    {
+      role: 'system',
+      content: `Eres un entrenador personal experto en crear planes de entrenamiento personalizados para deportes específicos.
+
+Genera un plan de entrenamiento en formato JSON exacto (sin markdown, sin explicaciones).
+
+Deporte: ${sportInfo.name}
+Atributos: ${sportInfo.attributes}
+Nivel: ${lvl}
+Objetivo: ${g}
+Días por semana: ${days}
+
+Formato JSON requerido:
+{
+  "name": "Nombre del plan",
+  "desc": "Descripción breve",
+  "weeks": [{
+    "label": "Semana 1",
+    "phase": "custom",
+    "days": [
+      [
+        { "name": "Nombre Ejercicio", "sets": 3, "reps": "8-12", "rir": 1, "rest": 90 },
+        ...
+      ]
+    ]
+  }]
+}
+
+Reglas:
+- ${days} días de entrenamiento
+- Ejercicios apropiados para ${sportInfo.name} que transfieran a ${sportInfo.attributes}
+- ${g === 'strength' ? '4-5 sets, 4-6 reps, descanso 120-180s' : g === 'endurance' ? '3 sets, 15-20 reps, descanso 30-60s' : '3-4 sets, 8-12 reps, descanso 60-90s'}
+- ${lvl === 'beginner' ? '3-4 ejercicios por día, menor volumen' : lvl === 'advanced' ? '6-8 ejercicios por día, mayor intensidad' : '5-6 ejercicios por día'}
+- Nombres de ejercicios en español
+- Incluir ejercicios compuestos + aislados
+- NO incluir markdown ni texto fuera del JSON`,
+    },
+    {
+      role: 'user',
+      content: `Crea un plan de ${days} días para ${sportInfo.name} nivel ${lvl} con objetivo ${g}.`,
+    },
+  ];
+
+  try {
+    const resp = await fetch(LLM_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LLM_API_KEY}`,
+      },
+      body: JSON.stringify({ model: LLM_MODEL, messages, max_tokens: 1500, temperature: 0.7 }),
+    });
+
+    if (!resp.ok) {
+      console.warn('LLM generate-plan error:', resp.status);
+      return null;
+    }
+
+    const data = await resp.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const generated = JSON.parse(jsonMatch[0]);
+    return {
+      name: generated.name || `Plan ${sportInfo.name}`,
+      emoji: '🤖',
+      desc: generated.desc || `Plan generado por IA`,
+      level: lvl,
+      goal: g,
+      daysPerWeek: days,
+      recommendedSports: [sport],
+      weeks: generated.weeks || [],
+      source: 'llm',
+    };
+  } catch (err) {
+    console.warn('LLM generate-plan failed:', err.message);
+    return null;
+  }
+}
+
+function localGeneratePlan({ sport, goal, level, daysPerWeek }) {
+  const dayNames = {
+    2: ['Upper', 'Lower'],
+    3: ['Full Body A', 'Full Body B', 'Full Body C'],
+    4: ['Upper A', 'Lower A', 'Upper B', 'Lower B'],
+    5: ['Empuje', 'Tirón', 'Piernas', 'Hombros', 'Brazos'],
+    6: ['Empuje A', 'Tirón A', 'Piernas A', 'Empuje B', 'Tirón B', 'Piernas B'],
+  };
+
+  const exercisePool = {
+    basketball: ['Sentadilla con Barra', 'Peso Muerto', 'Peso Muerto Rumano', 'Press Banca Plano', 'Press Hombro con Barra', 'Remo con Barra', 'Zancadas', 'Elevación de Talones', 'Plancha con Lastre', 'Ab Wheel (Rueda)', 'Curl con Barra', 'Extensión Tríceps en Polea', 'Face Pull', 'Elevaciones Laterales', 'Sentadilla Búlgara'],
+    football: ['Sentadilla con Barra', 'Peso Muerto', 'Peso Muerto Rumano', 'Zancadas', 'Prensa de Piernas', 'Plancha con Lastre', 'Remo con Barra', 'Press Hombro con Barra', 'Curl con Barra', 'Elevación de Talones', 'Extensión Tríceps en Polea'],
+    running: ['Peso Muerto Rumano', 'Sentadilla con Barra', 'Prensa de Piernas', 'Curl Femoral', 'Plancha con Lastre', 'Elevación de Talones', 'Remo con Barra', 'Zancadas'],
+    tennis: ['Peso Muerto Rumano', 'Zancadas', 'Sentadilla con Barra', 'Remo con Barra', 'Press Hombro con Barra', 'Plancha con Lastre', 'Extensión Tríceps en Polea', 'Curl con Barra', 'Ab Wheel (Rueda)', 'Elevaciones Laterales'],
+    crossfit: ['Sentadilla con Barra', 'Peso Muerto', 'Press Hombro con Barra', 'Remo con Barra', 'Plancha con Lastre', 'Zancadas', 'Flexiones', 'Burpees', 'Kettlebell Swing'],
+    general: ['Press Banca Plano', 'Remo con Barra', 'Sentadilla con Barra', 'Press Hombro con Barra', 'Peso Muerto Rumano', 'Jalón en Polea Alta', 'Curl con Barra', 'Extensión Tríceps en Polea', 'Elevaciones Laterales', 'Prensa de Piernas', 'Curl Femoral', 'Plancha', 'Face Pull', 'Elevación de Talones'],
+  };
+
+  const g = goal || 'hypertrophy';
+  const lvl = level || 'intermediate';
+  const days = daysPerWeek || 3;
+  const pool = exercisePool[sport] || exercisePool.general;
+
+  const repScheme = g === 'strength' ? { main: '4-6', secondary: '6-8', rest: 150 }
+    : g === 'endurance' ? { main: '15-20', secondary: '20-25', rest: 45 }
+    : { main: '8-12', secondary: '12-15', rest: 90 };
+
+  const setsBase = g === 'strength' ? 4 : 3;
+  const sets = lvl === 'beginner' ? Math.max(setsBase - 1, 2) : lvl === 'advanced' ? setsBase + 1 : setsBase;
+
+  function shufflePool() {
+    const a = [...pool];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function makeDay(exNames, isSecondary) {
+    const dayExercises = exNames.map((name, i) => ({
+      name,
+      sets,
+      reps: i < 4 ? repScheme.main : repScheme.secondary,
+      rir: i < 4 ? 1 : 0,
+      rest: repScheme.rest,
+    }));
+    return { label: '', exercises: dayExercises };
+  }
+
+  const shuffled = shufflePool();
+  const exercisesPerDay = lvl === 'beginner' ? 4 : lvl === 'advanced' ? 7 : 5;
+  const totalNeeded = days * exercisesPerDay;
+
+  const allExercises = [];
+  while (allExercises.length < totalNeeded) {
+    allExercises.push(...shuffled);
+  }
+
+  const weekDays = [];
+  for (let d = 0; d < days; d++) {
+    const start = d * exercisesPerDay;
+    const dayExs = allExercises.slice(start, start + exercisesPerDay);
+    weekDays.push(makeDay(dayExs));
+  }
+
+  return {
+    name: `Plan ${SPORTS[sport]?.name || 'Personalizado'} ${g.charAt(0).toUpperCase() + g.slice(1)}`,
+    emoji: '🤖',
+    desc: `Generado por IA local para ${SPORTS[sport]?.name || 'General'}. ${g === 'strength' ? 'Fuerza' : g === 'endurance' ? 'Resistencia' : 'Hipertrofia'} - ${days}d/sem`,
+    level: lvl,
+    goal: g,
+    daysPerWeek: days,
+    recommendedSports: [sport],
+    weeks: [{
+      label: 'Semana 1',
+      phase: 'custom',
+      days: weekDays.map(d => d.exercises),
+    }],
+    source: 'local',
+  };
+}
+
 module.exports = router;
