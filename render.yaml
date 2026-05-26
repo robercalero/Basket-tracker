@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: basket-tracker
+    env: docker
+    repo: https://github.com/robercalero/Basket-tracker
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LLM_API_KEY
+        sync: false
