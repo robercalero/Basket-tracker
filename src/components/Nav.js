@@ -3,8 +3,9 @@ import { $, mk } from '../utils/dom.js';
 export const TABS = [
   { id: 'home', icon: '🏠', label: 'Inicio' },
   { id: 'session', icon: '🏋️', label: 'Sesión' },
-  { id: 'stats', icon: '📊', label: 'Estadísticas' },
+  { id: 'stats', icon: '📊', label: 'Stats' },
   { id: 'progress', icon: '📈', label: 'Progreso' },
+  { id: 'plans', icon: '📋', label: 'Planes' },
   { id: 'profile', icon: '👤', label: 'Perfil' },
 ];
 

@@ -13,7 +13,8 @@ import { renderSession, startSession, endSession, toggleTimer, logSet, selEx, st
 import { renderStats } from './screens/Stats.js';
 import { renderHistory, clearHistory } from './screens/History.js';
 import { renderProgress } from './screens/Progress.js';
-import { renderProfile, saveProfileField, selectPlan, saveCurrentWeight, toggleFilterLevel, toggleFilterGoal, clearFilters } from './screens/Profile.js';
+import { renderProfile, saveProfileField, saveCurrentWeight } from './screens/Profile.js';
+import { renderPlans, selectPlan, toggleFilterLevel, toggleFilterGoal, clearFilters } from './screens/Plans.js';
 import { renderInstall } from './screens/Install.js';
 import { renderPlanCreator, startPlanCreator } from './screens/PlanCreator.js';
 import { renderExerciseDetail } from './screens/ExerciseDetail.js';
@@ -27,6 +28,7 @@ const renderers = {
   stats: renderStats,
   history: renderHistory,
   progress: renderProgress,
+  plans: renderPlans,
   profile: renderProfile,
   install: renderInstall,
   planCreator: renderPlanCreator,
@@ -156,6 +158,10 @@ window.showExercise = async (id) => {
   window.__exerciseId = id;
   await window.goTab('exerciseDetail');
 };
+window.showExerciseInfo = async (name) => {
+  const { showExerciseInfo } = await import('./screens/Session.js');
+  await showExerciseInfo(name);
+};
 window.showExerciseByName = async (name) => {
   const { findExerciseByName } = await import('./data/exercises/index.js');
   const ex = findExerciseByName(name);
@@ -170,9 +176,9 @@ window.delCustPlan = async (id) => {
     await dbDel('customPlanId');
     await dbSet('planIdx', 0);
   }
-  const { renderProfile } = await import('./screens/Profile.js');
-  await renderProfile();
-  window.goTab('profile');
+  const { renderPlans } = await import('./screens/Plans.js');
+  await renderPlans();
+  window.goTab('plans');
 };
 
 async function init() {

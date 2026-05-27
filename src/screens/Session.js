@@ -5,7 +5,19 @@ import { beep, bDone, bPR } from '../services/audio.js';
 import { PLANS } from '../data/plans/index.js';
 import { REST, restStart, restStop } from '../components/RestTimer.js';
 import { getCurrentWeek } from '../services/planUtils.js';
-import { findExerciseByName, getVariants } from '../data/exercises/index.js';
+import { findExerciseByName, getVariants, getExercise } from '../data/exercises/index.js';
+
+const GOAL_PCTS = {
+  strength: { min: 0.80, max: 0.90, label: '80-90%' },
+  hypertrophy: { min: 0.65, max: 0.80, label: '65-80%' },
+  endurance: { min: 0.50, max: 0.65, label: '50-65%' },
+};
+const GOAL_NAMES = { strength: 'Fuerza', hypertrophy: 'Hipertrofia', endurance: 'Resistencia' };
+
+function estimate1RM(weight, reps) {
+  if (!weight || !reps) return null;
+  return weight * (1 + reps / 30);
+}
 
 export const SES = { idx: -1, sidx: 0, timer: null, paused: false, accum: 0, start: 0, manualSelect: false };
 export let inSession = false;
@@ -97,7 +109,9 @@ export async function renderSession() {
           <div class="ex-item${isCurrent ? ' current' : ''}${isDone ? ' done' : ''}" onclick="window.selEx(${i})">
             <div class="ex-num${wuActive ? ' warmup' : ''}">${i + 1}</div>
             <div class="ex-info">
-              <div class="ex-name"><span style="cursor:pointer" onclick="event.stopPropagation();window.showExerciseByName('${ex.name.replace(/'/g, "\\'")}')">${ex.name}</span></div>
+              <div class="ex-name">
+                <span onclick="event.stopPropagation();window.showExerciseInfo('${ex.name.replace(/'/g, "\\'")}')">${ex.name} <span style="font-size:12px;opacity:0.5;cursor:pointer" title="Ver info del ejercicio">ℹ️</span></span>
+              </div>
               <div class="ex-detail">${done}/${total} series · ${ex.reps} reps · ${ex.rir} RIR ${wuActive ? '· CALENTAMIENTO' : ''}</div>
             </div>
             <div class="ex-actions">
@@ -353,12 +367,100 @@ export async function swapExercise(variantName) {
   await renderSession();
 }
 
+export async function showExerciseInfo(exName) {
+  const ex = findExerciseByName(exName);
+  if (!ex) return;
+
+  const planIdx = await dbGet('planIdx', 0);
+  const customPlans = await dbGet('customPlans', []);
+  const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
+  const plan = allPlans[planIdx];
+  const goal = plan?.goal || 'hypertrophy';
+  const pct = GOAL_PCTS[goal] || GOAL_PCTS.hypertrophy;
+
+  // Find last logged weight
+  const log = await dbGet('log', []);
+  let lastWeight = 0;
+  let lastReps = 0;
+  let lastDate = '';
+
+  for (let i = log.length - 1; i >= 0; i--) {
+    const day = log[i];
+    const exLog = day.ex?.find(e => e.n === exName);
+    if (exLog) {
+      const set = exLog.sets?.length > 0 ? exLog.sets[exLog.sets.length - 1] : null;
+      lastWeight = set?.w || exLog.w || 0;
+      lastReps = set?.r || exLog.r || 0;
+      lastDate = day.d;
+      if (lastWeight > 0) break;
+    }
+  }
+
+  let suggestedHtml = '';
+  if (lastWeight > 0 && lastReps > 0) {
+    const est1RM = estimate1RM(lastWeight, lastReps);
+    if (est1RM) {
+      const minW = Math.round(est1RM * pct.min / 2.5) * 2.5;
+      const maxW = Math.round(est1RM * pct.max / 2.5) * 2.5;
+      suggestedHtml = `
+        <div style="padding:12px;background:var(--sf);border-radius:10px;margin-top:10px">
+          <div style="font-weight:600;font-size:13px;margin-bottom:4px">💪 Peso sugerido (${GOAL_NAMES[goal]})</div>
+          <div style="font-size:18px;font-weight:800;color:var(--ac)">${minW} – ${maxW} kg</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:2px">${pct.label} de 1RM (estimado ${Math.round(est1RM)} kg)</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:4px">Basado en último registro: ${lastWeight} kg × ${lastReps} reps (${lastDate})</div>
+        </div>`;
+    }
+  } else if (lastWeight > 0) {
+    suggestedHtml = `
+      <div style="padding:12px;background:var(--sf);border-radius:10px;margin-top:10px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px">💪 Último peso registrado</div>
+        <div style="font-size:18px;font-weight:800;color:var(--ac)">${lastWeight} kg</div>
+        <div style="font-size:11px;color:var(--tx2);margin-top:2px">Registra reps para estimar 1RM y sugerir rango</div>
+      </div>`;
+  } else {
+    suggestedHtml = `
+      <div style="padding:12px;background:var(--sf);border-radius:10px;margin-top:10px">
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px">💪 Peso sugerido</div>
+        <div style="font-size:13px;color:var(--tx2)">Aún sin datos. Comienza con peso ligero y ajusta según RPE.</div>
+      </div>`;
+  }
+
+  const muscleLabels = { chest: 'Pecho', back: 'Espalda', shoulders: 'Hombros', arms: 'Brazos', legs: 'Piernas', abs: 'Abdominales' };
+  const equipLabels = { barbell: 'Barra', dumbbell: 'Mancuernas', cable: 'Cable', machine: 'Máquina', bodyweight: 'Bodyweight', bands: 'Bandas', kettlebell: 'Pesa rusa' };
+  const levelLabels = { beginner: 'Principiante', intermediate: 'Intermedio', advanced: 'Avanzado' };
+
+  const overlay = document.createElement('div');
+  overlay.className = 'rest-overlay show';
+  overlay.id = 'exerciseInfoOverlay';
+  overlay.innerHTML = `
+    <div class="card rest-card" style="max-width:360px;text-align:left">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:18px;font-weight:700">${ex.name}</div>
+          <div style="font-size:12px;color:var(--tx2);margin-top:2px">
+            ${muscleLabels[ex.muscleGroup] || ex.muscleGroup} · ${equipLabels[ex.equipment] || ex.equipment} · ${levelLabels[ex.level] || ex.level}
+          </div>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="this.closest('.rest-overlay').remove()" style="font-size:16px;padding:4px 8px">✕</button>
+      </div>
+
+      <div style="padding:12px;background:var(--sf);border-radius:10px">
+        <div style="font-weight:600;font-size:12px;margin-bottom:4px;color:var(--tx2)">📝 Cómo hacerlo</div>
+        <div style="font-size:13px;line-height:1.5">${ex.description}</div>
+      </div>
+
+      ${suggestedHtml}
+
+      <button class="btn btn-ghost btn-block" onclick="this.closest('.rest-overlay').remove()" style="margin-top:12px">Cerrar</button>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
 export function getExerciseVariants(exerciseName) {
   const ex = findExerciseByName(exerciseName);
   if (!ex) return [];
   const variants = getVariants(ex.id);
   if (variants.length === 0) {
-    // No direct variants, suggest same muscle group exercises
     return [];
   }
   return variants.filter(v => v && v.name !== exerciseName);
