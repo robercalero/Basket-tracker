@@ -4,7 +4,7 @@ export const TABS = [
   { id: 'home', icon: '🏠', label: 'Inicio' },
   { id: 'session', icon: '🏋️', label: 'Sesión' },
   { id: 'stats', icon: '📊', label: 'Stats' },
-  { id: 'progress', icon: '📈', label: 'Progreso' },
+  { id: 'chat', icon: '🤖', label: 'Chat' },
   { id: 'plans', icon: '📋', label: 'Planes' },
   { id: 'profile', icon: '👤', label: 'Perfil' },
 ];

@@ -13,6 +13,7 @@ import { renderSession, startSession, endSession, toggleTimer, logSet, selEx, st
 import { renderStats } from './screens/Stats.js';
 import { renderHistory, clearHistory } from './screens/History.js';
 import { renderProgress } from './screens/Progress.js';
+import { renderChat } from './screens/Chat.js';
 import { renderProfile, saveProfileField, saveCurrentWeight } from './screens/Profile.js';
 import { renderPlans, selectPlan, toggleFilterLevel, toggleFilterGoal, clearFilters } from './screens/Plans.js';
 import { renderInstall } from './screens/Install.js';
@@ -28,6 +29,7 @@ const renderers = {
   stats: renderStats,
   history: renderHistory,
   progress: renderProgress,
+  chat: renderChat,
   plans: renderPlans,
   profile: renderProfile,
   install: renderInstall,
@@ -271,40 +273,6 @@ async function showOnboarding() {
     await renderHome();
   });
 }
-
-// Coach AI query
-window.askCoach = async () => {
-  const btn = document.getElementById('coachAskBtn');
-  const input = document.getElementById('coachQuery');
-  const responseDiv = document.getElementById('coachResponse');
-  const query = input?.value?.trim();
-  if (!query || !btn) return;
-
-  btn.disabled = true;
-  btn.textContent = 'Pensando...';
-  responseDiv.style.display = 'none';
-
-  try {
-    const log = await dbGet('log', []);
-    const profile = await dbGet('profile', { sport: 'basketball' });
-    const exerciseLog = log.filter(l => l.ex?.length > 0).slice(-10).flatMap(l => l.ex);
-
-    const r = await fetch('/api/ai/coach', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exerciseLog, query, sport: profile.sport || 'basketball' }),
-    });
-    const data = await r.json();
-    responseDiv.textContent = data.advice || 'Sin respuesta del coach. Intenta de nuevo.';
-    responseDiv.style.display = 'block';
-  } catch (err) {
-    responseDiv.textContent = 'Error al consultar al coach. Verifica tu conexión e intenta de nuevo.';
-    responseDiv.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Preguntar';
-  }
-};
 
 // PWA install prompt
 window.__deferredPrompt = null;

@@ -78,15 +78,14 @@ export async function renderProgress() {
     console.warn('Coach AI error:', err);
   }
 
-  // Coach query section
-  const coachQueryCard = div('card');
-  coachQueryCard.innerHTML = `
-    <div style="font-size:12px;color:var(--tx2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🤖 Preguntar al Coach</div>
-    <textarea id="coachQuery" rows="2" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--sf);color:var(--tx);font-size:13px;resize:none;box-sizing:border-box" placeholder="Ej: ¿Cómo mejorar mi salto vertical?"></textarea>
-    <button class="btn btn-sm btn-primary btn-block" onclick="window.askCoach()" id="coachAskBtn" style="margin-top:6px">Preguntar</button>
-    <div id="coachResponse" style="display:none;margin-top:8px;padding:8px;background:var(--sf);border-radius:8px;font-size:12px;line-height:1.5;white-space:pre-wrap"></div>
-  `;
-  scr.appendChild(coachQueryCard);
+  // Link to chat for conversational coach
+  const chatLink = div('card');
+  chatLink.innerHTML = `
+    <button class="btn btn-primary btn-block" onclick="window.goTab('chat',null)" style="font-size:13px">
+      🤖 Hablar con el Coach IA
+    </button>
+    <div style="font-size:11px;color:var(--tx2);text-align:center;margin-top:6px">Conversación personalizada con IA especializada en tu deporte</div>`;
+  scr.appendChild(chatLink);
 
   // Aggregate exercises across all logs
   const exMap = {};
@@ -97,7 +96,7 @@ export async function renderProgress() {
     });
   });
 
-  const exerciseNames = Object.keys(exMap).sort();
+  const exerciseNames = Object.keys(exMap).sort().slice(0, 15);
 
   const header = div('card');
   header.innerHTML = `<div style="font-size:14px;font-weight:700">Progreso por ejercicio</div>

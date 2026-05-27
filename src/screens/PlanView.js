@@ -13,7 +13,7 @@ export async function renderPlanView() {
   const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
   const plan = allPlans[planIdx];
   if (!plan) {
-    scr.innerHTML = '<div class="card text-center"><p>Selecciona un plan en Perfil</p></div>';
+    scr.innerHTML = '<div class="card text-center"><p>Selecciona un plan en la sección <strong>Planes</strong></p><button class="btn btn-sm btn-primary mt-8" onclick="window.goTab(\'plans\',null)">Ir a Planes</button></div>';
     scr.classList.add('active');
     return;
   }

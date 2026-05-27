@@ -46,7 +46,12 @@ export function searchExercises(query) {
 export function findExerciseByName(name) {
   if (!name) return null
   const q = name.toLowerCase().trim()
-  return ALL.find(e => e.name.toLowerCase() === q) || null
+  let match = ALL.find(e => e.name.toLowerCase() === q)
+  if (match) return match
+  match = ALL.find(e => e.name.toLowerCase().includes(q) || q.includes(e.name.toLowerCase()))
+  if (match) return match
+  const words = q.split(/\s+/)
+  return ALL.find(e => words.every(w => e.name.toLowerCase().includes(w))) || null
 }
 
 let _byMuscleCache = null

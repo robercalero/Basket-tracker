@@ -56,7 +56,7 @@ export async function renderProfile() {
         <input type="number" id="weightInput" step="0.1" placeholder="kg" style="flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--br);background:var(--sf);color:var(--tx);font-size:15px">
         <button class="btn btn-sm btn-primary" onclick="saveCurrentWeight()">Guardar</button>
       </div>
-      <div style="margin-top:8px;max-height:160px;overflow-y:auto">
+      <div style="margin-top:8px;max-height:140px;overflow-y:auto">
         ${weightLog.slice(-10).reverse().map(w => `
           <div class="weight-entry">
             <span>${new Date(w.d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
@@ -64,6 +64,7 @@ export async function renderProfile() {
           </div>`).join('')}
         ${weightLog.length === 0 ? '<div style="color:var(--tx3);font-size:13px;text-align:center;padding:8px">Sin registros</div>' : ''}
       </div>
+      ${weightLog.length > 1 ? '<div class="chart-wrap" style="height:80px;margin-top:4px"><canvas id="weightChart"></canvas></div>' : ''}
     </div>
 
     <button class="btn btn-primary btn-block" onclick="window.goTab('plans',null)" style="margin:6px 0">
@@ -86,6 +87,37 @@ export async function renderProfile() {
   scr.classList.add('active');
   const installBtn = document.getElementById('installBtn');
   if (installBtn && window.__deferredPrompt) installBtn.style.display = 'inline-flex';
+  if (weightLog.length > 1) {
+    setTimeout(() => renderWeightChart(weightLog), 200);
+  }
+}
+
+function renderWeightChart(weightLog) {
+  const canvas = document.getElementById('weightChart');
+  if (!canvas) return;
+  const data = weightLog.slice(-15);
+  if (data.length < 2) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const w = rect.width, h = rect.height;
+  ctx.clearRect(0, 0, w, h);
+  const maxW = Math.max(...data.map(d => d.w));
+  const minW = Math.min(...data.map(d => d.w));
+  const pad = 8;
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((d.w - minW) / (Math.max(maxW - minW, 1))) * (h - pad * 2);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#7C5CFC';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 }
 
 export async function saveProfileField(field, value) {

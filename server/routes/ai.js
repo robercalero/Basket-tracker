@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 
 const LLM_API_KEY = process.env.LLM_API_KEY || '';
-const LLM_ENDPOINT = process.env.LLM_ENDPOINT || 'https://api.openai.com/v1/chat/completions';
-const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+const LLM_ENDPOINT = process.env.LLM_ENDPOINT || 'http://localhost:11434/api/chat';
+const LLM_MODEL = process.env.LLM_MODEL || 'llama3';
+const IS_OLLAMA = LLM_ENDPOINT.includes('localhost:11434') || LLM_ENDPOINT.includes('ollama');
 
 const SPORTS = {
   basketball: {
@@ -166,6 +167,173 @@ router.post('/ai/coach', async (req, res) => {
     });
   }
 });
+
+async function ollamaChat(messages) {
+  try {
+    const resp = await fetch(LLM_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: LLM_MODEL, messages, stream: false }),
+    });
+
+    if (!resp.ok) {
+      console.warn('Ollama error:', resp.status, await resp.text());
+      return null;
+    }
+
+    const data = await resp.json();
+    return data.message?.content || null;
+  } catch (err) {
+    console.warn('Ollama request failed:', err.message);
+    return null;
+  }
+}
+
+function buildSystemPrompt(context) {
+  const c = context || {};
+  const p = c.profile || {};
+  const plan = c.plan || {};
+  const stats = c.stats || {};
+
+  return `Eres un entrenador personal experto en rendimiento deportivo con especialización en transferencia del entrenamiento de gimnasio al deporte específico.
+
+## Perfil del usuario
+- Nombre: ${p.name || 'Usuario'}
+- Deporte: ${p.sport || 'Básquetbol'}
+- Altura: ${p.height || 175} cm
+
+## Plan actual
+${plan.name ? `- Plan: ${plan.name}\n- Objetivo: ${plan.goal || 'hipertrofia'}\n- Nivel: ${plan.level || 'intermedio'}\n- Días/semana: ${plan.daysPerWeek || 3}` : 'Sin plan activo'}
+
+## Estadísticas
+- Total de entrenos: ${stats.totalWorkouts || 0}
+${stats.lastWorkoutDate ? `- Último entreno: ${stats.lastWorkoutDate}` : ''}
+${stats.lastWorkoutExercises?.length ? `- Últimos ejercicios: ${stats.lastWorkoutExercises.map(e => e.name).join(', ')}` : ''}
+
+## Reglas de interacción
+1. Responde SIEMPRE en español, como un coach motivador y conocedor
+2. Si el usuario pide una rutina, pregúntale por: nivel, días disponibles, objetivo principal (fuerza/hipertrofia/resistencia), y cualquier limitación
+3. Conecta cada recomendación con su transferencia al deporte específico del usuario
+4. Si el usuario sube datos de entrenamiento, analízalos y sugiere mejoras concretas
+5. Sé conciso: máximo 3-4 párrafos por respuesta
+6. Si no tienes suficiente información, haz preguntas específicas en lugar de dar consejos genéricos
+7. Usa emojis ocasionalmente para hacer la conversación más amena`;
+}
+
+router.post('/ai/chat', async (req, res) => {
+  const { messages, context } = req.body;
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ message: { content: 'Envíame un mensaje para poder ayudarte.' }, source: 'local' });
+  }
+
+  try {
+    const systemPrompt = buildSystemPrompt(context);
+    const fullMessages = [
+      { role: 'system', content: systemPrompt },
+      ...messages,
+    ];
+
+    let content = null;
+    let source = 'local';
+
+    // Try Ollama first (if configured)
+    if (IS_OLLAMA) {
+      content = await ollamaChat(fullMessages);
+      source = 'ollama';
+    } else if (LLM_API_KEY) {
+      // Try OpenAI-compatible
+      content = await llmChat(fullMessages);
+      source = 'llm';
+    }
+
+    // Fallback to local
+    if (!content) {
+      content = localChatReply(messages, context);
+      source = 'local';
+    }
+
+    res.json({ message: { role: 'assistant', content }, source });
+  } catch (err) {
+    console.error('Chat error:', err.message);
+    const fallback = localChatReply(messages, context);
+    res.json({ message: { role: 'assistant', content: fallback }, source: 'error' });
+  }
+});
+
+async function llmChat(messages) {
+  try {
+    const resp = await fetch(LLM_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LLM_API_KEY}`,
+      },
+      body: JSON.stringify({ model: LLM_MODEL, messages, max_tokens: 500, temperature: 0.7 }),
+    });
+
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.choices?.[0]?.message?.content || null;
+  } catch {
+    return null;
+  }
+}
+
+function localChatReply(messages, context) {
+  const lastMsg = messages.filter(m => m.role === 'user').pop();
+  const query = lastMsg?.content?.toLowerCase() || '';
+  const c = context || {};
+  const sport = c.profile?.sport || 'básquetbol';
+  const sportId = c.profile?.sportId || 'basketball';
+
+  if (query.includes('rutina') || query.includes('plan') || query.includes('entrenamiento')) {
+    return `¡Genial que quieras mejorar tu entrenamiento para ${sport}! 🎯
+
+Para crear una rutina personalizada que transfiera al ${sport}, necesito saber:
+
+1️⃣ **Nivel de experiencia** — ¿Principiante, intermedio o avanzado?
+2️⃣ **Días disponibles** — ¿Cuántos días puedes entrenar a la semana?
+3️⃣ **Objetivo principal** — ¿Buscas fuerza, hipertrofia o resistencia?
+4️⃣ **Equipo disponible** — ¿Tienes acceso a barra, mancuernas, poleas?
+
+Cuéntame esto y te armo un plan perfecto para ti.`;
+  }
+
+  if (query.includes('salto') || query.includes('vertical') || query.includes('saltar')) {
+    return `Para mejorar tu salto vertical para ${sport}, enfócate en: ⬆️
+
+**Ejercicios clave:**
+• Sentadilla con Barra — base de potencia de piernas
+• Peso Muerto — cadena posterior completa
+• Elevación de Talones — empuje final
+
+**Recomendación:** Trabaja en rangos de 3-5 reps con 80-90% de tu 1RM para desarrollar potencia explosiva. Complementa con ejercicios pliométricos como saltos al cajón.
+
+¿Quieres que te detalle una rutina completa?`;
+  }
+
+  if (query.includes('progreso') || query.includes('cómo voy') || query.includes('evolución')) {
+    const total = c.stats?.totalWorkouts || 0;
+    if (total === 0) {
+      return `Aún no tienes entrenos registrados. ¡Empieza tu primera sesión y vuelve para ver tu evolución! 💪`;
+    }
+    return `Llevas **${total} entrenos** registrados. 💪
+
+Para darte un análisis más preciso, ¿qué ejercicio te gustaría revisar? Puedo decirte si estás progresando, estancado o necesitas cambiar algo.
+
+También puedes contarme cómo te sientes: ¿has notado mejoras en tu rendimiento en la cancha?`;
+  }
+
+  return `Hola! Soy tu coach para ${sport} 🏀
+
+Puedo ayudarte a:
+• Crear rutinas de gimnasio con transferencia a tu deporte
+• Analizar tu progreso y sugerir mejoras
+• Recomendar ejercicios específicos para tus objetivos
+
+¿Qué te gustaría trabajar hoy?`;
+}
 
 router.post('/ai/generate-plan', async (req, res) => {
   const { sport, goal, level, daysPerWeek } = req.body;

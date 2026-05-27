@@ -10,87 +10,143 @@ const LEVEL_NAMES = { beginner: 'Principiante', intermediate: 'Intermedio', adva
 const GOALS = ['hypertrophy', 'strength', 'endurance'];
 const GOAL_NAMES = { hypertrophy: 'Hipertrofia', strength: 'Fuerza', endurance: 'Resistencia' };
 
-let filterLevel = null;
-let filterGoal = null;
-let filterSport = null;
+let filterLevel = sessionStorage.getItem('planFilterLevel') || null;
+let filterGoal = sessionStorage.getItem('planFilterGoal') || null;
+let filterSport = sessionStorage.getItem('planFilterSport') || null;
+let _initialFilterSet = filterSport !== null;
+
+async function getDefaultSportFilter() {
+  if (!_initialFilterSet) {
+    const profile = await dbGet('profile', { sport: 'basketball' });
+    filterSport = profile.sport || 'basketball';
+    sessionStorage.setItem('planFilterSport', filterSport);
+    _initialFilterSet = true;
+  }
+}
+
+function persistFilters() {
+  if (filterLevel) sessionStorage.setItem('planFilterLevel', filterLevel);
+  else sessionStorage.removeItem('planFilterLevel');
+  if (filterGoal) sessionStorage.setItem('planFilterGoal', filterGoal);
+  else sessionStorage.removeItem('planFilterGoal');
+  if (filterSport) sessionStorage.setItem('planFilterSport', filterSport);
+  else sessionStorage.removeItem('planFilterSport');
+}
+
+function planMatchesSport(p, sportId) {
+  if (!sportId) return true;
+  return p.recommendedSports && (p.recommendedSports.includes(sportId) || p.recommendedSports.includes('general'));
+}
 
 export async function renderPlans() {
   const scr = $('plans');
   if (!scr) return;
   scr.innerHTML = '';
 
+  await getDefaultSportFilter();
+
+  const profile = await dbGet('profile', { sport: 'basketball' });
+  const userSport = profile.sport || 'basketball';
+  const userSportName = (SPORTS.find(s => s.id === userSport) || SPORTS[0]).name;
+
   const planIdx = await findActivePlanIdx();
   const customPlans = await (await import('../services/customPlans.js')).getCustomPlans();
   const allPlans = [...PLANS, ...customPlans.map(p => ({ ...p, custom: true }))];
-  const plan = allPlans[planIdx] || PLANS[0];
+  const activePlan = allPlans[planIdx] || PLANS[0];
 
   const filteredPlans = allPlans.filter(p => {
     if (filterLevel && p.level !== filterLevel) return false;
     if (filterGoal && p.goal !== filterGoal) return false;
-    if (filterSport && p.recommendedSports && !p.recommendedSports.includes(filterSport) && !p.recommendedSports.includes('general')) return false;
-    if (filterSport && !p.recommendedSports) return false;
+    if (filterSport && !planMatchesSport(p, filterSport)) return false;
     return true;
   });
 
+  const sportPlans = filteredPlans.filter(p => planMatchesSport(p, userSport));
+  const otherPlans = filteredPlans.filter(p => !planMatchesSport(p, userSport));
+
+  function renderPlanCard(p, compact) {
+    const realIdx = allPlans.indexOf(p);
+    const isActive = realIdx === planIdx;
+    if (compact) {
+      return `
+        <div class="plan-card-sm ${isActive ? 'active' : ''}" onclick="window.selectPlan(${realIdx})">
+          <span class="plan-emoji">${p.emoji || '📋'}</span>
+          <div class="plan-name">${p.name}${p.custom ? '✨' : ''}</div>
+          <div class="plan-badges">
+            <span class="plan-badge">${LEVEL_NAMES[p.level] || p.level || 'int'}</span>
+            <span class="plan-badge">${p.daysPerWeek || '?'}d</span>
+          </div>
+          ${isActive ? '<span class="active-tag">✓ ACTIVO</span>' : ''}
+        </div>`;
+    }
+    return `
+      <div class="plan-card ${isActive ? 'active' : ''}" onclick="window.selectPlan(${realIdx})" style="${isActive ? 'border-color:var(--ac)' : ''}">
+        <span class="plan-emoji">${p.emoji || '📋'}</span>
+        <div class="plan-info">
+          <div class="plan-name">${p.name}${p.custom ? ' <span style="font-size:10px;background:var(--ac);padding:1px 5px;border-radius:4px;color:#fff">custom</span>' : ''}</div>
+          <div class="plan-desc">${p.desc || ''}</div>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${LEVEL_NAMES[p.level] || p.level || 'intermediate'}</span>
+            <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${GOAL_NAMES[p.goal] || p.goal || 'hypertrophy'}</span>
+            <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${p.daysPerWeek || '?'}d/sem</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${isActive ? '<span style="color:var(--ac);font-size:12px;font-weight:600">ACTIVO</span>' : ''}
+          ${p.custom ? `<span style="cursor:pointer;color:var(--re);font-size:16px;opacity:0.6" onclick="event.stopPropagation();window.delCustPlan('${p.id}')">✕</span>` : ''}
+        </div>
+      </div>`;
+  }
+
   scr.innerHTML = `
-    <div class="card">
-      <div style="font-size:12px;color:var(--tx2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Filtros</div>
-      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--tx3);padding:4px 0;width:100%">Nivel:</span>
+    <details class="filter-bar" ${(filterLevel || filterGoal) ? 'open' : ''}>
+      <summary style="font-size:12px;color:var(--tx2);padding:8px 0;cursor:pointer;user-select:none">
+        ${(filterLevel || filterGoal) ? '🔽' : '🔼'} Filtros
+        ${filterLevel ? `<span style="margin-left:6px;font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px">${LEVEL_NAMES[filterLevel]}</span>` : ''}
+        ${filterGoal ? `<span style="margin-left:6px;font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px">${GOAL_NAMES[filterGoal]}</span>` : ''}
+        ${(filterLevel || filterGoal) ? '<span style="margin-left:6px;font-size:10px;color:var(--re);cursor:pointer" onclick="event.stopPropagation();window.clearFilters()">✕</span>' : ''}
+      </summary>
+      <div style="padding:8px 0 4px;display:flex;gap:6px;flex-wrap:wrap">
         ${LEVELS.map(l => `
-          <span class="filter-chip" style="padding:4px 12px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:12px;cursor:pointer${filterLevel === l ? ' active' : ''}" onclick="window.toggleFilterLevel('${l}')">${LEVEL_NAMES[l]}</span>
+          <span class="filter-chip" style="padding:3px 10px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:11px;cursor:pointer${filterLevel === l ? ' active' : ''}" onclick="window.toggleFilterLevel('${l}')">${LEVEL_NAMES[l]}</span>
         `).join('')}
       </div>
-      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--tx3);padding:4px 0;width:100%">Objetivo:</span>
+      <div style="padding:4px 0;display:flex;gap:6px;flex-wrap:wrap">
         ${GOALS.map(g => `
-          <span class="filter-chip" style="padding:4px 12px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:12px;cursor:pointer${filterGoal === g ? ' active' : ''}" onclick="window.toggleFilterGoal('${g}')">${GOAL_NAMES[g]}</span>
+          <span class="filter-chip" style="padding:3px 10px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:11px;cursor:pointer${filterGoal === g ? ' active' : ''}" onclick="window.toggleFilterGoal('${g}')">${GOAL_NAMES[g]}</span>
         `).join('')}
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--tx3);padding:4px 0;width:100%">Deporte:</span>
+      <div style="padding:4px 0;display:flex;gap:6px;flex-wrap:wrap">
         ${SPORTS.map(s => `
-          <span class="filter-chip" style="padding:4px 12px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:12px;cursor:pointer${filterSport === s.id ? ' active' : ''}" onclick="window.toggleFilterSport('${s.id}')">${s.emoji} ${s.name}</span>
+          <span class="filter-chip" style="padding:3px 10px;border-radius:6px;background:var(--sf);border:1px solid var(--br);font-size:11px;cursor:pointer${filterSport === s.id ? ' active' : ''}" onclick="window.toggleFilterSport('${s.id}')">${s.emoji} ${s.name}</span>
         `).join('')}
       </div>
-      ${(filterLevel || filterGoal || filterSport) ? '<div style="margin-top:8px"><span style="padding:4px 12px;border-radius:6px;background:transparent;border:1px solid var(--re);font-size:11px;cursor:pointer;color:var(--re)" onclick="window.clearFilters()">✕ Limpiar filtros</span></div>' : ''}
-    </div>
+    </details>
 
-    <div class="card">
-      <div style="font-size:12px;color:var(--tx2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">
-        Planes ${filteredPlans.length !== allPlans.length ? `<span style="font-size:11px;color:var(--tx3)">(${filteredPlans.length}/${allPlans.length})</span>` : ''}
+    ${sportPlans.length > 0 ? `
+    <div class="plan-section">
+      <div class="plan-section-title">⭐ Recomendados para ${userSportName}</div>
+      <div class="plan-hscroll">
+        ${sportPlans.map(p => renderPlanCard(p, true)).join('')}
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${filteredPlans.map((p, i) => {
-          const realIdx = allPlans.indexOf(p);
-          return `
-          <div class="plan-card ${realIdx === planIdx ? 'active' : ''}" onclick="selectPlan(${realIdx})" style="${realIdx === planIdx ? 'border-color:var(--ac)' : ''}">
-            <span class="plan-emoji">${p.emoji || '📋'}</span>
-            <div class="plan-info">
-              <div class="plan-name">${p.name}${p.custom ? ' <span style="font-size:10px;background:var(--ac);padding:1px 5px;border-radius:4px;color:#fff">custom</span>' : ''}</div>
-              <div class="plan-desc">${p.desc || ''}</div>
-              <div style="display:flex;gap:6px;margin-top:4px">
-                <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${LEVEL_NAMES[p.level] || p.level || 'intermediate'}</span>
-                <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${GOAL_NAMES[p.goal] || p.goal || 'hypertrophy'}</span>
-                <span style="font-size:10px;background:var(--cl);padding:2px 6px;border-radius:4px;color:var(--tx2)">${p.daysPerWeek || '?'}d/sem</span>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px">
-              ${realIdx === planIdx ? '<span style="color:var(--ac);font-size:12px;font-weight:600">ACTIVO</span>' : ''}
-              ${p.custom ? `<span style="cursor:pointer;color:var(--re);font-size:16px;opacity:0.6" onclick="event.stopPropagation();window.delCustPlan('${p.id}')">✕</span>` : ''}
-            </div>
-          </div>`;
-        }).join('')}
-        ${filteredPlans.length === 0 ? '<div style="color:var(--tx3);font-size:13px;text-align:center;padding:12px">Ningún plan coincide con los filtros</div>' : ''}
+    </div>` : ''}
+
+    ${otherPlans.length > 0 ? `
+    <div class="plan-section">
+      <div class="plan-section-title">📋 Todos los planes${filteredPlans.length !== allPlans.length ? ` (${filteredPlans.length})` : ''}</div>
+      <div class="plan-grid-2">
+        ${otherPlans.map(p => renderPlanCard(p, true)).join('')}
       </div>
+    </div>` : ''}
+
+    ${filteredPlans.length === 0 ? '<div style="color:var(--tx3);font-size:13px;text-align:center;padding:24px">Ningún plan coincide con los filtros</div>' : ''}
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+      <button class="btn btn-ghost btn-block" onclick="window.startPlanCreator()" style="font-size:12px">+ Crear plan personalizado</button>
+      <button class="btn btn-primary btn-block" onclick="window.showAIPlanGen()" style="font-size:12px">🤖 Generar Plan con IA</button>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-ghost btn-block" onclick="window.startPlanCreator()" style="font-size:13px">+ Crear plan personalizado</button>
-      <button class="btn btn-primary btn-block" onclick="window.showAIPlanGen()" style="font-size:13px">🤖 Generar Plan con IA</button>
-    </div>
-
-    <div id="aiPlanGen" style="display:none">
+    <div id="aiPlanGen" style="display:none;margin-top:8px">
       <div class="card" style="border-color:var(--ac)">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px">🤖 Generar Plan con IA</div>
         <div class="profile-field">
@@ -128,6 +184,7 @@ export async function renderPlans() {
     </div>
 
     <div style="height:12px"></div>`;
+
   scr.classList.add('active');
 }
 
@@ -167,23 +224,26 @@ export async function findActivePlanIdx() {
 
 export function toggleFilterLevel(level) {
   filterLevel = filterLevel === level ? null : level;
+  persistFilters();
   renderPlans();
 }
 
 export function toggleFilterGoal(goal) {
   filterGoal = filterGoal === goal ? null : goal;
+  persistFilters();
   renderPlans();
 }
 
 export async function toggleFilterSport(sport) {
   filterSport = filterSport === sport ? null : sport;
+  persistFilters();
   renderPlans();
 }
 
 export function clearFilters() {
   filterLevel = null;
   filterGoal = null;
-  filterSport = null;
+  persistFilters();
   renderPlans();
 }
 
@@ -211,11 +271,18 @@ window.generateAIPlan = async function() {
   if (!btn || !status) return;
   btn.disabled = true;
   btn.textContent = 'Generando...';
-  status.textContent = 'Generando plan...';
+  status.textContent = 'Conectando con IA...';
 
   try {
-    const { generatePlan } = await import('../services/planGenerator.js');
-    const plan = generatePlan({ sport: profile.sport, goal, level, daysPerWeek: days });
+    const resp = await fetch('/api/ai/generate-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sport: profile.sport, goal, level, daysPerWeek: days }),
+    });
+    const data = await resp.json();
+    const plan = data.plan;
+    if (!plan || !plan.weeks || plan.weeks.length === 0) throw new Error('Plan inválido');
+
     const { saveCustomPlan } = await import('../services/customPlans.js');
     await saveCustomPlan(plan);
     await dbSet('customPlanId', plan.id);
@@ -227,7 +294,24 @@ window.generateAIPlan = async function() {
       await renderHome();
     }
   } catch (err) {
-    status.textContent = '❌ Error: ' + err.message;
+    // Fallback: use local generator if server fails
+    try {
+      status.textContent = 'Servidor no disponible, generando localmente...';
+      const { generatePlan } = await import('../services/planGenerator.js');
+      const plan = generatePlan({ sport: profile.sport, goal, level, daysPerWeek: days });
+      const { saveCustomPlan } = await import('../services/customPlans.js');
+      await saveCustomPlan(plan);
+      await dbSet('customPlanId', plan.id);
+      status.textContent = '✅ Plan generado localmente. Activándolo...';
+      window.closeAIPlanGen();
+      await renderPlans();
+      const homeScr = document.getElementById('home');
+      if (homeScr && homeScr.classList.contains('active')) {
+        await renderHome();
+      }
+    } catch (fallbackErr) {
+      status.textContent = '❌ Error: ' + fallbackErr.message;
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = '🤖 Generar Plan';

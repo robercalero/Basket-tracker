@@ -94,10 +94,15 @@ async function mergeWorkouts(remoteWorkouts) {
   for (const rw of remoteWorkouts) {
     const idx = local.findIndex(l => l.d === rw.d);
     if (idx === -1) {
-      local.push(rw);
-    } else if (!local[idx]._synced) {
-      // Local change takes priority (offline-first)
-      // Only merge if no local changes
+      local.push({ ...rw, _synced: true });
+    } else {
+      // Merge exercises: combine unique exercises from both sides
+      const localExNames = (local[idx].ex || []).map(e => e.n);
+      const remoteExs = (rw.ex || []).filter(e => !localExNames.includes(e.n));
+      if (remoteExs.length > 0) {
+        local[idx].ex = [...(local[idx].ex || []), ...remoteExs];
+        local[idx]._synced = true;
+      }
     }
   }
   await dbSet('log', local);
@@ -106,8 +111,12 @@ async function mergeWorkouts(remoteWorkouts) {
 async function mergeWeightLog(remoteWeights) {
   const local = await dbGet('weightLog', []);
   for (const rw of remoteWeights) {
-    if (!local.find(l => l.d === rw.d)) {
+    const match = local.find(l => l.d === rw.d);
+    if (!match) {
       local.push({ d: rw.d, w: rw.w });
+    } else if (!match._synced) {
+      // Keep the higher weight (likely more recent intent)
+      match.w = Math.max(match.w, rw.w);
     }
   }
   local.sort((a, b) => a.d.localeCompare(b.d));

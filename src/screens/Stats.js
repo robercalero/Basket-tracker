@@ -24,15 +24,16 @@ export async function renderStats() {
 
   // Current streak
   let streak = 0;
-  const d = new Date();
-  const off = d.getTimezoneOffset();
-  const todayLocal = new Date(d.getTime() - off * 60000).toISOString().split('T')[0];
+  const streakNow = new Date();
+  const off = streakNow.getTimezoneOffset();
+  const todayLocal = new Date(streakNow.getTime() - off * 60000).toISOString().split('T')[0];
+  const cursor = new Date(streakNow);
   for (let i = 0; i < 365; i++) {
-    const key = d.toISOString().split('T')[0];
+    const key = cursor.toISOString().split('T')[0];
     if (log.find(l => l.d === key)) {
       if (key === todayLocal || streak > 0) streak++;
     } else if (i > 0) break;
-    d.setDate(d.getDate() - 1);
+    cursor.setDate(cursor.getDate() - 1);
   }
 
   // Weekly comparison (handles Sunday correctly)
